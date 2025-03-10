@@ -29,9 +29,14 @@ DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
 if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
 
-def load_data():
-    """Load data from JSON file"""
-    data_file = os.path.join(DATA_DIR, 'hunt_data.json')
+def load_data(username='default'):
+    """Load data from JSON file for specific user"""
+    # Create user directory if it doesn't exist
+    user_dir = os.path.join(DATA_DIR, username)
+    if not os.path.exists(user_dir):
+        os.makedirs(user_dir)
+        
+    data_file = os.path.join(user_dir, 'hunt_data.json')
     
     if not os.path.exists(data_file):
         return {
@@ -43,9 +48,14 @@ def load_data():
     with open(data_file, 'r') as f:
         return json.load(f)
 
-def save_data(data):
-    """Save data to JSON file"""
-    data_file = os.path.join(DATA_DIR, 'hunt_data.json')
+def save_data(data, username='default'):
+    """Save data to JSON file for specific user"""
+    # Create user directory if it doesn't exist
+    user_dir = os.path.join(DATA_DIR, username)
+    if not os.path.exists(user_dir):
+        os.makedirs(user_dir)
+        
+    data_file = os.path.join(user_dir, 'hunt_data.json')
     
     with open(data_file, 'w') as f:
         json.dump(data, f, indent=2)
@@ -152,10 +162,14 @@ class HuntAnalyzer:
 # Routes
 @app.route('/')
 def index():
-    """Home page with API token input."""
+    """Home page with username and API token input."""
+    # Check if user is already logged in
+    if 'username' in session and 'api_token' in session:
+        return redirect(url_for('hunts'))
+        
     # Check if API token is in environment variables
     api_token = os.environ.get('SUBLIME_API_TOKEN')
-    if api_token:
+    if api_token and 'username' in session:
         # Set the token in session
         try:
             analyzer = HuntAnalyzer(api_token)
@@ -170,8 +184,14 @@ def index():
 
 @app.route('/set_token', methods=['POST'])
 def set_token():
-    """Set the API token."""
+    """Set the username and API token."""
+    username = request.form.get('username', '').strip()
     api_token = request.form.get('api_token', '').strip()
+    
+    if not username:
+        flash('Username cannot be empty!', 'danger')
+        return redirect(url_for('index'))
+        
     if not api_token:
         flash('API token cannot be empty!', 'danger')
         return redirect(url_for('index'))
@@ -181,21 +201,31 @@ def set_token():
         analyzer = HuntAnalyzer(api_token)
         # Just a small request to test if token works
         session['api_token'] = api_token
-        flash('API token set successfully!', 'success')
+        session['username'] = username
+        flash(f'Welcome, {username}! API token set successfully!', 'success')
         return redirect(url_for('hunts'))
     except Exception as e:
         flash(f'Error: {str(e)}', 'danger')
         return redirect(url_for('index'))
 
+@app.route('/logout')
+def logout():
+    """Log out the current user."""
+    session.pop('username', None)
+    session.pop('api_token', None)
+    flash('You have been logged out successfully.', 'success')
+    return redirect(url_for('index'))
+
 @app.route('/hunts')
 def hunts():
     """Show hunt history and entry form."""
-    if 'api_token' not in session:
-        flash('Please set your API token first', 'warning')
+    if 'api_token' not in session or 'username' not in session:
+        flash('Please log in first', 'warning')
         return redirect(url_for('index'))
     
-    data = load_data()
-    return render_template('hunts.html', hunts=data.get('hunts', []))
+    username = session['username']
+    data = load_data(username)
+    return render_template('hunts.html', hunts=data.get('hunts', []), username=username)
 
 def reprocess_samples_internal(analyzer, data):
     """Internal function to reprocess all samples to ensure hunt stats are accurate."""
@@ -402,12 +432,14 @@ def reprocess_samples_internal(analyzer, data):
 @app.route('/reprocess_samples', methods=['POST'])
 def reprocess_samples():
     """Reprocess all samples to ensure hunt stats are accurate."""
-    if 'api_token' not in session:
-        flash('Please set your API token first', 'warning')
+    if 'api_token' not in session or 'username' not in session:
+        flash('Please log in first', 'warning')
         return redirect(url_for('index'))
     
+    username = session['username']
+    
     # Load data
-    data = load_data()
+    data = load_data(username)
     hunts = data.get('hunts', [])
     
     if not hunts:
@@ -417,6 +449,8 @@ def reprocess_samples():
     try:
         analyzer = HuntAnalyzer(session['api_token'])
         if reprocess_samples_internal(analyzer, data):
+            # Save with the username
+            save_data(data, username)
             flash('Samples reprocessed successfully. Hunt stats have been updated.', 'success')
         else:
             flash('No hunts to reprocess', 'warning')
@@ -428,9 +462,11 @@ def reprocess_samples():
 @app.route('/clear_data', methods=['POST'])
 def clear_data():
     """Clear all hunt data and reset the application."""
-    if 'api_token' not in session:
-        flash('Please set your API token first', 'warning')
+    if 'api_token' not in session or 'username' not in session:
+        flash('Please log in first', 'warning')
         return redirect(url_for('index'))
+    
+    username = session['username']
     
     # Reset data to empty state
     empty_data = {
@@ -438,7 +474,7 @@ def clear_data():
         'true_positives': {},
         'false_positives': {}
     }
-    save_data(empty_data)
+    save_data(empty_data, username)
     
     flash('All hunt data has been cleared successfully!', 'success')
     return redirect(url_for('hunts'))
@@ -446,12 +482,14 @@ def clear_data():
 @app.route('/delete_hunt/<hunt_id>', methods=['POST'])
 def delete_hunt(hunt_id):
     """Delete a specific hunt while preserving shared sample data."""
-    if 'api_token' not in session:
-        flash('Please set your API token first', 'warning')
+    if 'api_token' not in session or 'username' not in session:
+        flash('Please log in first', 'warning')
         return redirect(url_for('index'))
     
+    username = session['username']
+    
     # Load data
-    data = load_data()
+    data = load_data(username)
     hunts = data.get('hunts', [])
     true_positives = data.get('true_positives', {})
     false_positives = data.get('false_positives', {})
@@ -529,7 +567,7 @@ def delete_hunt(hunt_id):
         # Save updated data
         data['true_positives'] = true_positives
         data['false_positives'] = false_positives
-        save_data(data)
+        save_data(data, username)
         
         flash(f'Hunt "{hunt_to_delete["name"]}" has been deleted successfully!', 'success')
         return redirect(url_for('hunts'))
@@ -541,14 +579,16 @@ def delete_hunt(hunt_id):
 @app.route('/add_hunt', methods=['POST'])
 def add_hunt():
     """Add a new hunt to analyze."""
-    if 'api_token' not in session:
-        flash('Please set your API token first', 'warning')
+    if 'api_token' not in session or 'username' not in session:
+        flash('Please log in first', 'warning')
         return redirect(url_for('index'))
+    
+    username = session['username']
     
     hunt_id = request.form.get('hunt_id', '').strip()
     hunt_name = request.form.get('hunt_name', '').strip()
     
-    logger.info(f"Adding new hunt ID: {hunt_id}, Name: {hunt_name}")
+    logger.info(f"User {username} adding new hunt ID: {hunt_id}, Name: {hunt_name}")
     
     if not hunt_id or not hunt_name:
         logger.warning("Hunt ID or name is missing")
@@ -556,7 +596,7 @@ def add_hunt():
         return redirect(url_for('hunts'))
     
     # Load data
-    data = load_data()
+    data = load_data(username)
     hunts = data.get('hunts', [])
     
     # Check if this hunt was already added
@@ -652,7 +692,7 @@ def add_hunt():
         hunts.append(hunt_data)
         
         data['hunts'] = hunts
-        save_data(data)
+        save_data(data, username)
         logger.info(f"Hunt {hunt_id} added to database with {len(results)} samples")
         
         pre_labeled = tp_count + fp_count
@@ -669,6 +709,8 @@ def add_hunt():
             logger.info("Running reprocess_samples_internal after adding hunt")
             # We already have an analyzer instance
             reprocess_result = reprocess_samples_internal(analyzer, data)
+            if reprocess_result:
+                save_data(data, username)
             logger.info(f"Reprocess completed, result: {reprocess_result}")
         except Exception as e:
             logger.error(f"Error reprocessing samples after adding hunt: {str(e)}", exc_info=True)
@@ -684,13 +726,15 @@ def analyze_hunt(hunt_id):
     """Analyze a specific hunt."""
     logger.info(f"Analyzing hunt {hunt_id}")
     
-    if 'api_token' not in session:
-        logger.warning("API token not set, redirecting to index")
-        flash('Please set your API token first', 'warning')
+    if 'api_token' not in session or 'username' not in session:
+        logger.warning("Not logged in, redirecting to index")
+        flash('Please log in first', 'warning')
         return redirect(url_for('index'))
     
+    username = session['username']
+    
     # Load data
-    data = load_data()
+    data = load_data(username)
     
     # Find the hunt
     hunt = next((h for h in data.get('hunts', []) if h['id'] == hunt_id), None)
@@ -700,7 +744,7 @@ def analyze_hunt(hunt_id):
         flash('Hunt not found', 'danger')
         return redirect(url_for('hunts'))
     
-    logger.info(f"Found hunt {hunt_id}: {hunt.get('name', 'Unknown')}")
+    logger.info(f"User {username} analyzing hunt {hunt_id}: {hunt.get('name', 'Unknown')}")
     logger.debug(f"Hunt details: {hunt}")
     
     # Get hunt results
@@ -843,7 +887,7 @@ def analyze_hunt(hunt_id):
             for h in data['hunts']:
                 if h['id'] == hunt_id:
                     h['pre_labeled_viewed'] = True
-                    save_data(data)  # Save this flag
+                    save_data(data, username)  # Save this flag with username
                     break
             logger.info(f"Marked hunt {hunt_id} as viewed for the first time")
         
@@ -851,7 +895,8 @@ def analyze_hunt(hunt_id):
                               hunt=hunt_copy, 
                               message_groups=message_groups, 
                               counts_mismatch=counts_mismatch, 
-                              show_all_messages=show_all_messages)
+                              show_all_messages=show_all_messages,
+                              username=username)
     except Exception as e:
         flash(f'Error: {str(e)}', 'danger')
         return redirect(url_for('hunts'))
@@ -859,16 +904,18 @@ def analyze_hunt(hunt_id):
 @app.route('/categorize', methods=['POST'])
 def categorize():
     """Categorize a message as true positive or false positive."""
-    if 'api_token' not in session:
-        logger.warning("Categorize attempt without API token")
-        return jsonify({'status': 'error', 'message': 'API token not set'})
+    if 'api_token' not in session or 'username' not in session:
+        logger.warning("Categorize attempt without being logged in")
+        return jsonify({'status': 'error', 'message': 'Not logged in'})
+    
+    username = session['username']
     
     msg_id = request.form.get('msg_id')
     hunt_id = request.form.get('hunt_id')
     subject = request.form.get('subject')
     category = request.form.get('category')
     
-    logger.info(f"Categorizing message {msg_id} from hunt {hunt_id} as {category}")
+    logger.info(f"User {username} categorizing message {msg_id} from hunt {hunt_id} as {category}")
     
     if not all([msg_id, hunt_id, subject, category]):
         logger.warning(f"Missing parameters: msg_id={msg_id}, hunt_id={hunt_id}, subject={subject}, category={category}")
@@ -879,7 +926,7 @@ def categorize():
         return jsonify({'status': 'error', 'message': 'Invalid category'})
     
     # Load data
-    data = load_data()
+    data = load_data(username)
     true_positives = data.get('true_positives', {})
     false_positives = data.get('false_positives', {})
     hunts = data.get('hunts', [])
@@ -951,7 +998,7 @@ def categorize():
     data['true_positives'] = true_positives
     data['false_positives'] = false_positives
     data['hunts'] = hunts
-    save_data(data)
+    save_data(data, username)
     
     logger.info(f"Categorization complete for message {msg_id} as {category}")
     return jsonify({'status': 'success'})
@@ -959,15 +1006,17 @@ def categorize():
 @app.route('/mass_categorize', methods=['POST'])
 def mass_categorize():
     """Categorize multiple messages at once."""
-    if 'api_token' not in session:
-        logger.warning("Mass categorize attempt without API token")
-        return jsonify({'status': 'error', 'message': 'API token not set'})
+    if 'api_token' not in session or 'username' not in session:
+        logger.warning("Mass categorize attempt without being logged in")
+        return jsonify({'status': 'error', 'message': 'Not logged in'})
+    
+    username = session['username']
     
     hunt_id = request.form.get('hunt_id')
     message_ids = request.form.getlist('message_ids[]')
     category = request.form.get('category')
     
-    logger.info(f"Mass categorizing {len(message_ids)} messages from hunt {hunt_id} as {category}")
+    logger.info(f"User {username} mass categorizing {len(message_ids)} messages from hunt {hunt_id} as {category}")
     
     if not hunt_id or not message_ids or not category:
         logger.warning(f"Missing parameters: hunt_id={hunt_id}, message_ids={message_ids}, category={category}")
@@ -978,7 +1027,7 @@ def mass_categorize():
         return jsonify({'status': 'error', 'message': 'Invalid category'})
     
     # Load data
-    data = load_data()
+    data = load_data(username)
     true_positives = data.get('true_positives', {})
     false_positives = data.get('false_positives', {})
     hunts = data.get('hunts', [])
@@ -1037,7 +1086,7 @@ def mass_categorize():
     data['true_positives'] = true_positives
     data['false_positives'] = false_positives
     data['hunts'] = hunts
-    save_data(data)
+    save_data(data, username)
     
     logger.info(f"Mass categorization complete. {len(successful_ids)} succeeded, {len(failed_ids)} failed")
     return jsonify({
@@ -1050,26 +1099,29 @@ def mass_categorize():
 @app.route('/compare')
 def compare():
     """Compare hunts page."""
-    if 'api_token' not in session:
-        flash('Please set your API token first', 'warning')
+    if 'api_token' not in session or 'username' not in session:
+        flash('Please log in first', 'warning')
         return redirect(url_for('index'))
     
-    data = load_data()
-    return render_template('compare.html', hunts=data.get('hunts', []))
+    username = session['username']
+    data = load_data(username)
+    return render_template('compare.html', hunts=data.get('hunts', []), username=username)
 
 @app.route('/compare_hunts', methods=['POST'])
 def compare_hunts():
     """Compare two hunts and show results."""
     logger.info("Starting hunt comparison")
     
-    if 'api_token' not in session:
-        logger.warning("API token not set, redirecting to index")
-        flash('Please set your API token first', 'warning')
+    if 'api_token' not in session or 'username' not in session:
+        logger.warning("Not logged in, redirecting to index")
+        flash('Please log in first', 'warning')
         return redirect(url_for('index'))
+    
+    username = session['username']
     
     previous_hunt_id = request.form.get('previous_hunt')
     current_hunt_id = request.form.get('current_hunt')
-    logger.info(f"Comparing hunts: previous={previous_hunt_id}, current={current_hunt_id}")
+    logger.info(f"User {username} comparing hunts: previous={previous_hunt_id}, current={current_hunt_id}")
     
     if not previous_hunt_id or not current_hunt_id:
         logger.warning("Missing hunt IDs for comparison")
@@ -1082,7 +1134,7 @@ def compare_hunts():
         return redirect(url_for('compare'))
     
     # Load data
-    data = load_data()
+    data = load_data(username)
     hunts = data.get('hunts', [])
     
     # Find the hunts

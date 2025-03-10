@@ -12,14 +12,19 @@
       <div class="card-body">
         <p class="card-text">This tool helps you analyze and compare Sublime Security hunt results to improve your detection rules.</p>
         
-        <h5 class="mt-4">Set Your API Token</h5>
-        <p>To get started, please enter your Sublime Security API token:</p>
+        <h5 class="mt-4">Login</h5>
+        <p>To get started, please enter your username and Sublime Security API token:</p>
         
         <form action="{{ url_for('set_token') }}" method="post">
           <div class="mb-3">
+            <label for="username" class="form-label">Username</label>
+            <input type="text" class="form-control" id="username" name="username" placeholder="Enter your username" required>
+          </div>
+          <div class="mb-3">
+            <label for="api_token" class="form-label">API Token</label>
             <input type="password" class="form-control" id="api_token" name="api_token" placeholder="Enter your API token" required>
           </div>
-          <button type="submit" class="btn btn-primary">Set Token</button>
+          <button type="submit" class="btn btn-primary">Login</button>
         </form>
       </div>
     </div>

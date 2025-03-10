@@ -65,6 +65,19 @@
             <a class="nav-link" href="{{ url_for('compare') }}">Compare</a>
           </li>
         </ul>
+        
+        {% if session.username %}
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="fas fa-user"></i> {{ session.username }}
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
+              <li><a class="dropdown-item" href="{{ url_for('logout') }}">Logout</a></li>
+            </ul>
+          </li>
+        </ul>
+        {% endif %}
       </div>
     </div>
   </nav>
