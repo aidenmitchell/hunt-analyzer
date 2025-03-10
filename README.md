@@ -19,46 +19,42 @@ The easiest way to deploy Hunt Analyzer is using Docker and docker-compose.
 - Docker and docker-compose installed on your server
 - Tailscale (optional) for secure access
 
-### GitHub Integration with Automatic Updates
+### Deployment with Portainer (Recommended)
 
-This setup uses GitHub Container Registry with GitHub Actions for automatic builds and updates.
+This application is designed to work seamlessly with Portainer for easy deployment and updates.
 
-1. Fork this repository to your GitHub account
+1. In your Portainer instance, go to Stacks → Add stack
 
-2. Enable GitHub Actions in your repository settings
+2. Use the following settings:
+   - Name: hunt-analyzer
+   - Deployment Type: Repository
+   - Repository URL: https://github.com/aidenmitchell/hunt-analyzer.git
+   - Repository reference: main
+   - Compose path: docker-compose.yml
 
-3. On your Portainer server, create a .env file:
-```bash
-# Create a .env file for configuration
-touch .env
-```
+3. Add these environment variables:
+   ```
+   SUBLIME_API_TOKEN=your_api_token_here
+   SECRET_KEY=generate_a_random_string_here
+   ```
 
-4. Configure the .env file with your GitHub username and other settings:
-```
-GITHUB_USERNAME=yourusername
-DOCKER_REGISTRY=ghcr.io
-TAG=latest
-SUBLIME_API_TOKEN=your_api_token_here
-SECRET_KEY=your_random_secret_here
-```
+4. Click "Deploy the stack"
 
-5. Create a docker-compose.yml file:
-```bash
-# Download the docker-compose.yml
-curl -O https://raw.githubusercontent.com/yourusername/hunt-analyzer/main/docker-compose.yml
-```
+5. Access the application through your Portainer-managed host at port 5000
 
-6. Deploy using docker-compose or Portainer:
-```bash
-docker-compose up -d
-```
+6. Enable Auto-Update (optional):
+   - In your stack, click "Enable auto update"
+   - Set interval to 5 minutes
 
-7. Access the application at http://localhost:5000 or through your Tailscale IP.
+### Updating Your Deployment
 
-### To Update
+The application uses GitHub Actions to automatically build Docker images whenever changes are pushed to the repository.
 
-When you push changes to your GitHub repository, GitHub Actions will automatically build a new Docker image. To pull the latest image:
+**For Portainer with auto-update enabled:**
+- Updates happen automatically based on your polling interval
+- No manual action required
 
+**For manual updates (Portainer or docker-compose):**
 ```bash
 # Pull latest image
 docker-compose pull
@@ -67,32 +63,37 @@ docker-compose pull
 docker-compose up -d
 ```
 
-You can also setup a webhook in Portainer to automatically redeploy when a new image is published.
-
 ### Persistent Data
 
 Your hunt data is stored in the `./data` directory which is mounted as a volume in the Docker container. This ensures your data persists across container restarts.
 
-### Portainer Integration with Auto-Updates
+### Manual Deployment with Docker Compose
 
-If you're using Portainer with Stacks:
+If you prefer to deploy directly with docker-compose:
 
-1. Go to Stacks → Add stack
-2. Use "Repository" as the build method
-3. Configure the following:
-   - Repository URL: Your GitHub repository URL
-   - Repository reference: main
-   - Compose path: docker-compose.yml
-   - Environment variables: Add variables from step 4 above
-4. Deploy the stack
+1. Create a directory for the application:
+```bash
+mkdir -p hunt-analyzer/data
+cd hunt-analyzer
+```
 
-For automatic updates, you can:
+2. Download the docker-compose.yml file:
+```bash
+curl -O https://raw.githubusercontent.com/aidenmitchell/hunt-analyzer/main/docker-compose.yml
+```
 
-1. In Portainer, go to your stack
-2. Click "Enable auto-update"
-3. Set a polling interval (e.g., 5 minutes)
+3. Create a .env file (optional):
+```bash
+echo "SUBLIME_API_TOKEN=your_token_here" > .env
+echo "SECRET_KEY=random_secret_key" >> .env
+```
 
-This will automatically check for changes in your docker-compose.yml and pull the latest image.
+4. Start the application:
+```bash
+docker-compose up -d
+```
+
+5. Access at http://localhost:5000 or through your Tailscale IP.
 
 ### Stopping and Updating
 

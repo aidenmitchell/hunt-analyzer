@@ -2,8 +2,8 @@ version: '3'
 
 services:
   hunt-analyzer:
-    # Use image instead of build for easy GitHub integration
-    image: ${DOCKER_REGISTRY:-ghcr.io}/${GITHUB_USERNAME:-yourusername}/hunt-analyzer:${TAG:-latest}
+    # Public image from GitHub Container Registry
+    image: ghcr.io/aidenmitchell/hunt-analyzer:main
     container_name: hunt-analyzer
     ports:
       - "5000:5000"
