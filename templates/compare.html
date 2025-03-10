@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}Compare Hunts{% endblock %}
+
+{% block scripts %}
+<script>
+  $(document).ready(function() {
+    // Function to check if selected hunts are fully labeled
+    function validateHuntSelections() {
+      var prevHunt = $('#previous_hunt option:selected');
+      var currHunt = $('#current_hunt option:selected');
+      var compareBtn = $('#compare-button');
+      var warningMsg = $('#compare-warning');
+      
+      // Check if both hunts are selected
+      if (prevHunt.val() === '' || currHunt.val() === '') {
+        compareBtn.prop('disabled', true);
+        warningMsg.text('Please select both hunts').show();
+        return;
+      }
+      
+      // Check if any selected hunt is not fully labeled
+      var prevNotLabeled = prevHunt.attr('data-not-labeled') === 'true';
+      var currNotLabeled = currHunt.attr('data-not-labeled') === 'true';
+      
+      if (prevNotLabeled || currNotLabeled) {
+        compareBtn.prop('disabled', true);
+        
+        var warning = 'Cannot compare: ';
+        if (prevNotLabeled) {
+          warning += '"' + prevHunt.text().trim() + '" is not fully labeled. ';
+        }
+        if (currNotLabeled) {
+          warning += '"' + currHunt.text().trim() + '" is not fully labeled. ';
+        }
+        warning += 'Please label all samples first.';
+        
+        warningMsg.text(warning).show();
+      } else {
+        compareBtn.prop('disabled', false);
+        warningMsg.hide();
+      }
+    }
+    
+    // Attach event listeners to selects
+    $('#previous_hunt, #current_hunt').on('change', validateHuntSelections);
+    
+    // Initial validation
+    validateHuntSelections();
+  });
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h2>Compare Hunts</h2>
+      <div>
+        <form action="{{ url_for('reprocess_samples') }}" method="post" class="d-inline me-2">
+          <button type="submit" class="btn btn-info">
+            <i class="fas fa-sync"></i> Reprocess All Samples
+          </button>
+        </form>
+        <a href="{{ url_for('hunts') }}" class="btn btn-secondary">
+          <i class="fas fa-arrow-left"></i> Back to Hunts
+        </a>
+      </div>
+    </div>
+    
+    {% if hunts|length < 2 %}
+      <div class="alert alert-warning">
+        <i class="fas fa-exclamation-triangle"></i> You need at least two hunts to perform a comparison. Please add more hunts.
+      </div>
+    {% else %}
+      <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i> <strong>Tip:</strong> If you're experiencing issues with sample counts or labeling status, click the "Reprocess All Samples" button to refresh hunt statistics.
+      </div>
+    {% endif %}
+    
+    {% if hunts|length >= 2 %}
+      <div class="card">
+        <div class="card-header bg-primary text-white">
+          <h4 class="mb-0">Select Hunts to Compare</h4>
+        </div>
+        <div class="card-body">
+          <form action="{{ url_for('compare_hunts') }}" method="post">
+            <div class="row">
+              <div class="col-md-5">
+                <div class="mb-3">
+                  <label for="previous_hunt" class="form-label">Previous Hunt (Baseline)</label>
+                  <select class="form-select" id="previous_hunt" name="previous_hunt" required>
+                    <option value="">Select a hunt...</option>
+                    {% for hunt in hunts %}
+                      {% set direct_labeled = hunt.true_positives_count + hunt.false_positives_count %}
+                      {% set pre_labeled = hunt.pre_labeled_count|default(0) %}
+                      {% set total_labeled = direct_labeled + pre_labeled %}
+                      {% set fully_labeled = total_labeled >= hunt.total_samples %}
+                      <option value="{{ hunt.id }}" {% if not fully_labeled %}data-not-labeled="true"{% endif %}>
+                        {{ hunt.name }} 
+                        ({{ hunt.total_samples }} samples{% if not fully_labeled %}, {{ total_labeled }}/{{ hunt.total_samples }} labeled ({{ pre_labeled }} pre-labeled){% endif %})
+                        {% if not fully_labeled %} - Incomplete{% endif %}
+                      </option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+              
+              <div class="col-md-2 d-flex align-items-center justify-content-center">
+                <i class="fas fa-arrow-right fa-2x"></i>
+              </div>
+              
+              <div class="col-md-5">
+                <div class="mb-3">
+                  <label for="current_hunt" class="form-label">Current Hunt</label>
+                  <select class="form-select" id="current_hunt" name="current_hunt" required>
+                    <option value="">Select a hunt...</option>
+                    {% for hunt in hunts %}
+                      {% set direct_labeled = hunt.true_positives_count + hunt.false_positives_count %}
+                      {% set pre_labeled = hunt.pre_labeled_count|default(0) %}
+                      {% set total_labeled = direct_labeled + pre_labeled %}
+                      {% set fully_labeled = total_labeled >= hunt.total_samples %}
+                      <option value="{{ hunt.id }}" {% if not fully_labeled %}data-not-labeled="true"{% endif %}>
+                        {{ hunt.name }} 
+                        ({{ hunt.total_samples }} samples{% if not fully_labeled %}, {{ total_labeled }}/{{ hunt.total_samples }} labeled ({{ pre_labeled }} pre-labeled){% endif %})
+                        {% if not fully_labeled %} - Incomplete{% endif %}
+                      </option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+            </div>
+            
+            <div class="alert alert-warning mt-3" id="compare-warning" style="display: none;">
+              Please select both hunts to compare
+            </div>
+            
+            <div class="d-grid">
+              <button type="submit" id="compare-button" class="btn btn-primary">
+                <i class="fas fa-exchange-alt"></i> Compare Hunts
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+      
+      <div class="card mt-4">
+        <div class="card-header bg-info text-white">
+          <h4 class="mb-0">How Comparison Works</h4>
+        </div>
+        <div class="card-body">
+          <p>Hunt comparison helps you understand how your detection rule has improved:</p>
+          <ul>
+            <li><strong>Matching True Positives:</strong> Messages correctly detected in both hunts</li>
+            <li><strong>Persisting False Positives:</strong> False positives that still appear in the new rule</li>
+            <li><strong>Eliminated False Positives:</strong> False positives that no longer appear (good!)</li>
+            <li><strong>Missing True Positives:</strong> True positives that were missed by the new rule (bad!)</li>
+          </ul>
+          <p>The ideal outcome is where your new rule maintains all true positives while reducing false positives.</p>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

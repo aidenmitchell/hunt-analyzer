@@ -1,0 +1,503 @@
+{% extends "base.html" %}
+
+{% block title %}Comparison Results{% endblock %}
+
+{% block head_extra %}
+<style>
+  /* Custom styles for accordion headers */
+  .accordion-button:not(.collapsed) {
+    box-shadow: none;
+  }
+  .accordion-button:focus {
+    box-shadow: none;
+    border-color: rgba(0,0,0,.125);
+  }
+  .accordion-item.border-success .accordion-button {
+    background-color: #28a745 !important;
+    color: white !important;
+  }
+  .accordion-item.border-info .accordion-button {
+    background-color: #17a2b8 !important;
+    color: white !important;
+  }
+  .accordion-item.border-warning .accordion-button {
+    background-color: #ffc107 !important;
+    color: #212529 !important;
+  }
+  .accordion-item.border-danger .accordion-button {
+    background-color: #dc3545 !important;
+    color: white !important;
+  }
+  /* Button collapsed state */
+  .accordion-item.border-success .accordion-button.collapsed {
+    background-color: #e9f9f0 !important;
+    color: #28a745 !important;
+  }
+  .accordion-item.border-info .accordion-button.collapsed {
+    background-color: #e7f5f8 !important;
+    color: #17a2b8 !important;
+  }
+  .accordion-item.border-warning .accordion-button.collapsed {
+    background-color: #fff8e6 !important;
+    color: #856404 !important;
+  }
+  .accordion-item.border-danger .accordion-button.collapsed {
+    background-color: #f8eaea !important;
+    color: #dc3545 !important;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h2>Hunt Comparison Results</h2>
+      <div>
+        <a href="{{ url_for('compare') }}" class="btn btn-secondary me-2">
+          <i class="fas fa-arrow-left"></i> Back to Compare
+        </a>
+        <a href="{{ url_for('hunts') }}" class="btn btn-primary">
+          <i class="fas fa-list"></i> All Hunts
+        </a>
+      </div>
+    </div>
+    
+    <!-- Comparison Header -->
+    <div class="card mb-4">
+      <div class="card-header bg-dark text-white">
+        <div class="row">
+          <div class="col-5 text-center">
+            <h5>{{ comparison.prev_hunt.name }}</h5>
+            <small>{{ comparison.prev_samples }} samples</small>
+            {% if comparison.prev_hunt.timeframe %}
+            <div class="mt-1">
+              <small>
+                Timeframe: 
+                {% if comparison.prev_hunt.timeframe.duration_days is defined %}
+                  {{ comparison.prev_hunt.timeframe.duration_days }} days
+                {% elif comparison.prev_hunt.timeframe.duration_minutes is defined %}
+                  {{ (comparison.prev_hunt.timeframe.duration_minutes / 1440)|round(1) }} days
+                {% else %}
+                  Unknown
+                {% endif %}
+                <br>
+                <span class="text-muted">{{ comparison.prev_hunt.timeframe.formatted_start }} - {{ comparison.prev_hunt.timeframe.formatted_end }}</span>
+              </small>
+            </div>
+            {% endif %}
+          </div>
+          <div class="col-2 text-center">
+            <i class="fas fa-arrow-right"></i>
+          </div>
+          <div class="col-5 text-center">
+            <h5>{{ comparison.curr_hunt.name }}</h5>
+            <small>{{ comparison.curr_samples }} samples</small>
+            {% if comparison.curr_hunt.timeframe %}
+            <div class="mt-1">
+              <small>
+                Timeframe: 
+                {% if comparison.curr_hunt.timeframe.duration_days is defined %}
+                  {{ comparison.curr_hunt.timeframe.duration_days }} days
+                {% elif comparison.curr_hunt.timeframe.duration_minutes is defined %}
+                  {{ (comparison.curr_hunt.timeframe.duration_minutes / 1440)|round(1) }} days
+                {% else %}
+                  Unknown
+                {% endif %}
+                <br>
+                <span class="text-muted">{{ comparison.curr_hunt.timeframe.formatted_start }} - {{ comparison.curr_hunt.timeframe.formatted_end }}</span>
+              </small>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% if comparison.timeframe_warning %}
+      <div class="card-footer bg-warning text-dark">
+        <div class="d-flex align-items-center">
+          <i class="fas fa-exclamation-triangle me-2"></i>
+          <strong>{{ comparison.timeframe_warning }}</strong>
+        </div>
+        <div class="mt-2">
+          <div class="row">
+            <div class="col-md-6">
+              <small>
+                <strong>Previous Hunt:</strong> 
+                {% if comparison.prev_hunt.timeframe %}
+                  {{ comparison.prev_hunt.timeframe.formatted_start }} to {{ comparison.prev_hunt.timeframe.formatted_end }}
+                  ({{ comparison.prev_hunt.timeframe.duration_days|default((comparison.prev_hunt.timeframe.duration_minutes / 1440)|round(1)) }} days)
+                {% else %}
+                  Unknown timeframe
+                {% endif %}
+              </small>
+            </div>
+            <div class="col-md-6">
+              <small>
+                <strong>Current Hunt:</strong> 
+                {% if comparison.curr_hunt.timeframe %}
+                  {{ comparison.curr_hunt.timeframe.formatted_start }} to {{ comparison.curr_hunt.timeframe.formatted_end }}
+                  ({{ comparison.curr_hunt.timeframe.duration_days|default((comparison.curr_hunt.timeframe.duration_minutes / 1440)|round(1)) }} days)
+                {% else %}
+                  Unknown timeframe
+                {% endif %}
+              </small>
+            </div>
+          </div>
+        </div>
+        <small class="text-muted d-block mt-2">Comparing hunts with different timeframes may lead to misleading results.</small>
+      </div>
+      {% endif %}
+    </div>
+    
+    <!-- Analysis Summary -->
+    <div class="card mb-4">
+      <div class="card-header bg-{{ comparison.analysis.type }} text-white">
+        <h4 class="mb-0">Analysis</h4>
+      </div>
+      <div class="card-body">
+        <p class="mb-0">{{ comparison.analysis.message }}</p>
+      </div>
+    </div>
+    
+    <!-- MQL Diff Section -->
+    <div class="card mb-4">
+      <div class="card-header bg-dark text-white">
+        <h4 class="mb-0">MQL Query Comparison</h4>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5>Changes between hunts:</h5>
+            <div>
+              <span class="badge bg-light text-dark border">Legend:</span>
+              <span class="badge" style="background-color:#ffdce0;">Removed</span>
+              <span class="badge" style="background-color:#e6ffed;">Added</span>
+            </div>
+          </div>
+          <div class="mql-diff bg-light p-3 rounded border" style="max-height: 400px; overflow-y: auto;">
+            {{ comparison.mql_diff|safe }}
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Metrics -->
+    <div class="row mb-4">
+      <div class="col-md-3">
+        <div class="card text-center">
+          <div class="card-header bg-success text-white">
+            <h5 class="mb-0">TP Retention</h5>
+          </div>
+          <div class="card-body">
+            <h3>{{ comparison.metrics.tp_retention_percent|round(1) }}%</h3>
+            <p>{{ comparison.common_true_positives|length }} / {{ comparison.prev_true_positives }}</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-3">
+        <div class="card text-center">
+          <div class="card-header bg-danger text-white">
+            <h5 class="mb-0">FP Reduction</h5>
+          </div>
+          <div class="card-body">
+            <h3>{{ comparison.metrics.fp_reduction_percent|round(1) }}%</h3>
+            <p>{{ comparison.metrics.fp_reduction_count }} / {{ comparison.prev_false_positives }}</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-3">
+        <div class="card text-center">
+          <div class="card-header bg-info text-white">
+            <h5 class="mb-0">New TPs</h5>
+          </div>
+          <div class="card-body">
+            <h3>{{ comparison.metrics.new_tp_count }}</h3>
+            <p>New true positives found</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-3">
+        <div class="card text-center">
+          <div class="card-header bg-warning text-white">
+            <h5 class="mb-0">Missing TPs</h5>
+          </div>
+          <div class="card-body">
+            <h3>{{ comparison.missing_all_true_positives|length }}</h3>
+            <p>Missing true positives</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Accordion for all sections -->
+    <div class="accordion mb-4" id="comparisonAccordion">
+      
+      <!-- Matching True Positives Section -->
+      {% if comparison.common_true_positives %}
+      <div class="accordion-item border-success">
+        <h2 class="accordion-header" id="matchingTruePositivesHeading">
+          <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#matchingTruePositivesContent" aria-expanded="true" aria-controls="matchingTruePositivesContent">
+            <strong>Matching True Positives ({{ comparison.common_true_positives|length }})</strong>
+          </button>
+        </h2>
+        <div id="matchingTruePositivesContent" class="accordion-collapse collapse show" aria-labelledby="matchingTruePositivesHeading">
+          <div class="accordion-body">
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Previous Hunt</th>
+                    <th>Current Hunt</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for tp in comparison.common_true_positives %}
+                  <tr>
+                    <td>
+                      <span class="badge tp-badge">TP</span> {{ tp.prev_subject }}
+                    </td>
+                    <td>
+                      <span class="badge tp-badge">TP</span> {{ tp.curr_subject }}
+                    </td>
+                    <td>
+                      <a href="https://platform.sublime.security/messages/{{ tp.id }}" target="_blank" class="btn btn-sm btn-info">
+                        <i class="fas fa-external-link-alt"></i> View
+                      </a>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+      
+      <!-- New True Positives Section -->
+      {% if comparison.new_true_positives %}
+      <div class="accordion-item border-info">
+        <h2 class="accordion-header" id="newTruePositivesHeading">
+          <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#newTruePositivesContent" aria-expanded="true" aria-controls="newTruePositivesContent">
+            <strong>New True Positives ({{ comparison.new_true_positives|length }})</strong>
+          </button>
+        </h2>
+        <div id="newTruePositivesContent" class="accordion-collapse collapse show" aria-labelledby="newTruePositivesHeading">
+          <div class="accordion-body">
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Previous Hunt</th>
+                    <th>Current Hunt</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for tp in comparison.new_true_positives %}
+                  <tr>
+                    <td>
+                      <span class="badge bg-secondary">NOT PRESENT</span>
+                    </td>
+                    <td>
+                      <span class="badge tp-badge">TP</span> {{ tp.subject }}
+                    </td>
+                    <td>
+                      <a href="https://platform.sublime.security/messages/{{ tp.id }}" target="_blank" class="btn btn-sm btn-info">
+                        <i class="fas fa-external-link-alt"></i> View
+                      </a>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+      
+      <!-- Eliminated False Positives Section -->
+      {% if comparison.eliminated_false_positives %}
+      <div class="accordion-item border-success">
+        <h2 class="accordion-header" id="eliminatedFalsePositivesHeading">
+          <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#eliminatedFalsePositivesContent" aria-expanded="true" aria-controls="eliminatedFalsePositivesContent">
+            <strong>Eliminated False Positives ({{ comparison.eliminated_false_positives|length }})</strong>
+          </button>
+        </h2>
+        <div id="eliminatedFalsePositivesContent" class="accordion-collapse collapse show" aria-labelledby="eliminatedFalsePositivesHeading">
+          <div class="accordion-body">
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Previous Hunt</th>
+                    <th>Current Hunt</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for fp in comparison.eliminated_false_positives %}
+                  <tr>
+                    <td>
+                      <span class="badge fp-badge">FP</span> {{ fp.subject }}
+                    </td>
+                    <td>
+                      <span class="badge bg-success">ELIMINATED</span>
+                    </td>
+                    <td>
+                      <a href="https://platform.sublime.security/messages/{{ fp.id }}" target="_blank" class="btn btn-sm btn-info">
+                        <i class="fas fa-external-link-alt"></i> View
+                      </a>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+            
+      <!-- Missing True Positives Section -->
+      {% if comparison.missing_true_positives %}
+      <div class="accordion-item border-warning">
+        <h2 class="accordion-header" id="missingTruePositivesHeading">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#missingTruePositivesContent" aria-expanded="false" aria-controls="missingTruePositivesContent">
+            <strong>Missing True Positives from Previous Hunt ({{ comparison.missing_true_positives|length }})</strong>
+          </button>
+        </h2>
+        <div id="missingTruePositivesContent" class="accordion-collapse collapse" aria-labelledby="missingTruePositivesHeading">
+          <div class="accordion-body">
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Previous Hunt</th>
+                    <th>Current Hunt</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for tp in comparison.missing_true_positives %}
+                  <tr>
+                    <td>
+                      <span class="badge tp-badge">TP</span> {{ tp.subject }}
+                    </td>
+                    <td>
+                      <span class="badge bg-warning text-dark">MISSING</span>
+                    </td>
+                    <td>
+                      <a href="https://platform.sublime.security/messages/{{ tp.id }}" target="_blank" class="btn btn-sm btn-info">
+                        <i class="fas fa-external-link-alt"></i> View
+                      </a>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+      
+      <!-- Missing True Positives from All Hunts Section -->
+      {% if comparison.missing_all_true_positives %}
+      <div class="accordion-item border-warning">
+        <h2 class="accordion-header" id="missingAllTruePositivesHeading">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#missingAllTruePositivesContent" aria-expanded="false" aria-controls="missingAllTruePositivesContent">
+            <strong>Missing True Positives from All Hunts ({{ comparison.missing_all_true_positives|length }})</strong>
+          </button>
+        </h2>
+        <div id="missingAllTruePositivesContent" class="accordion-collapse collapse" aria-labelledby="missingAllTruePositivesHeading">
+          <div class="accordion-body">
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Original Hunt</th>
+                    <th>Subject</th>
+                    <th>Current Hunt</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for tp in comparison.missing_all_true_positives %}
+                  <tr>
+                    <td>
+                      <span class="badge bg-secondary">{{ tp.hunt_name }}</span>
+                    </td>
+                    <td>
+                      <span class="badge tp-badge">TP</span> {{ tp.subject }}
+                    </td>
+                    <td>
+                      <span class="badge bg-warning text-dark">MISSING</span>
+                    </td>
+                    <td>
+                      <a href="https://platform.sublime.security/messages/{{ tp.id }}" target="_blank" class="btn btn-sm btn-info">
+                        <i class="fas fa-external-link-alt"></i> View
+                      </a>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+      
+      <!-- Persisting False Positives Section -->
+      {% if comparison.common_false_positives %}
+      <div class="accordion-item border-danger">
+        <h2 class="accordion-header" id="persistingFalsePositivesHeading">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#persistingFalsePositivesContent" aria-expanded="false" aria-controls="persistingFalsePositivesContent">
+            <strong>Persisting False Positives ({{ comparison.common_false_positives|length }})</strong>
+          </button>
+        </h2>
+        <div id="persistingFalsePositivesContent" class="accordion-collapse collapse" aria-labelledby="persistingFalsePositivesHeading">
+          <div class="accordion-body">
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Previous Hunt</th>
+                    <th>Current Hunt</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for fp in comparison.common_false_positives %}
+                  <tr>
+                    <td>
+                      <span class="badge fp-badge">FP</span> {{ fp.prev_subject }}
+                    </td>
+                    <td>
+                      <span class="badge fp-badge">FP</span> {{ fp.curr_subject }}
+                    </td>
+                    <td>
+                      <a href="https://platform.sublime.security/messages/{{ fp.id }}" target="_blank" class="btn btn-sm btn-info">
+                        <i class="fas fa-external-link-alt"></i> View
+                      </a>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+      
+    </div><!-- End of accordion -->
+  </div>
+</div>
+{% endblock %}

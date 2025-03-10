@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header bg-dark text-white">
+        <h3 class="mb-0">Welcome to Hunt Analyzer</h3>
+      </div>
+      <div class="card-body">
+        <p class="card-text">This tool helps you analyze and compare Sublime Security hunt results to improve your detection rules.</p>
+        
+        <h5 class="mt-4">Set Your API Token</h5>
+        <p>To get started, please enter your Sublime Security API token:</p>
+        
+        <form action="{{ url_for('set_token') }}" method="post">
+          <div class="mb-3">
+            <input type="password" class="form-control" id="api_token" name="api_token" placeholder="Enter your API token" required>
+          </div>
+          <button type="submit" class="btn btn-primary">Set Token</button>
+        </form>
+      </div>
+    </div>
+    
+    <div class="card mt-4">
+      <div class="card-header bg-info text-white">
+        <h4 class="mb-0">How to Use</h4>
+      </div>
+      <div class="card-body">
+        <ol>
+          <li>Enter your Sublime Security API token</li>
+          <li>Add hunts to analyze by providing their IDs</li>
+          <li>Evaluate messages by categorizing them as true or false positives</li>
+          <li>Compare hunts to track your rule improvements</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+
+{% block title %}Hunts{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-header bg-primary text-white">
+        <h4 class="mb-0">Add New Hunt</h4>
+      </div>
+      <div class="card-body">
+        <form action="{{ url_for('add_hunt') }}" method="post">
+          <div class="mb-3">
+            <label for="hunt_id" class="form-label">Hunt ID</label>
+            <input type="text" class="form-control" id="hunt_id" name="hunt_id" required>
+          </div>
+          <div class="mb-3">
+            <label for="hunt_name" class="form-label">Hunt Name</label>
+            <input type="text" class="form-control" id="hunt_name" name="hunt_name" 
+                   placeholder="e.g., Initial rule, v2 with domain filter" required>
+          </div>
+          <button type="submit" class="btn btn-primary w-100">Add Hunt</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header bg-dark text-white">
+        <h4 class="mb-0">Hunt History</h4>
+      </div>
+      <div class="card-body">
+        {% if hunts %}
+          <div class="table-responsive">
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Samples</th>
+                  <th>True Positives</th>
+                  <th>False Positives</th>
+                  <th>Pre-labeled</th>
+                  <th>Status</th>
+                  <th>Timeframe</th>
+                  <th>Date Added</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for hunt in hunts %}
+                <tr>
+                  <td>
+                    {{ hunt.name }}
+                    {% if hunt.status_warning %}
+                    <div class="mt-1">
+                      <span class="badge bg-warning text-dark" title="{{ hunt.status_warning }}">
+                        <i class="fas fa-exclamation-triangle"></i> Incomplete
+                      </span>
+                    </div>
+                    {% endif %}
+                  </td>
+                  <td>{{ hunt.total_samples }}</td>
+                  <td>
+                    <span class="badge tp-badge">{{ hunt.true_positives_count }}</span>
+                  </td>
+                  <td>
+                    <span class="badge fp-badge">{{ hunt.false_positives_count }}</span>
+                  </td>
+                  <td>
+                    <span class="badge bg-info">{{ hunt.pre_labeled_count|default(0) }}</span>
+                  </td>
+                  <td>
+                    {% set labeled = hunt.true_positives_count + hunt.false_positives_count + hunt.pre_labeled_count|default(0) %}
+                    {% if labeled >= hunt.total_samples %}
+                      <span class="badge bg-success">Complete</span>
+                    {% else %}
+                      <span class="badge bg-warning text-dark">{{ labeled }}/{{ hunt.total_samples }}</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if hunt.timeframe %}
+                    <span title="{{ hunt.timeframe.formatted_start }} - {{ hunt.timeframe.formatted_end }}">
+                      {% if hunt.timeframe.duration_days is defined %}
+                        {{ hunt.timeframe.duration_days }} days
+                      {% elif hunt.timeframe.duration_minutes is defined %}
+                        {{ (hunt.timeframe.duration_minutes / 1440)|round(1) }} days
+                      {% else %}
+                        <span class="text-muted">Unknown duration</span>
+                      {% endif %}
+                    </span>
+                    {% else %}
+                    <span class="text-muted">Unknown</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ hunt.date_added }}</td>
+                  <td>
+                    <div class="btn-group" role="group">
+                      <a href="{{ url_for('analyze_hunt', hunt_id=hunt.id) }}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-search"></i> Analyze
+                      </a>
+                      <button type="button" class="btn btn-sm btn-danger" 
+                              data-bs-toggle="modal" data-bs-target="#deleteHuntModal{{ hunt.id }}">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </div>
+                    
+                    <!-- Delete Hunt Modal -->
+                    <div class="modal fade" id="deleteHuntModal{{ hunt.id }}" tabindex="-1" 
+                         aria-labelledby="deleteHuntModalLabel{{ hunt.id }}" aria-hidden="true">
+                      <div class="modal-dialog">
+                        <div class="modal-content">
+                          <div class="modal-header">
+                            <h5 class="modal-title" id="deleteHuntModalLabel{{ hunt.id }}">
+                              Confirm Hunt Deletion
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                          </div>
+                          <div class="modal-body">
+                            <p class="text-danger">
+                              <i class="fas fa-exclamation-triangle"></i> 
+                              <strong>Warning:</strong> You are about to delete hunt "{{ hunt.name }}".
+                            </p>
+                            <p>Sample labels will be preserved if they appear in other hunts.</p>
+                            <p>Are you sure you want to delete this hunt?</p>
+                          </div>
+                          <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <form action="{{ url_for('delete_hunt', hunt_id=hunt.id) }}" method="post" id="deleteHuntForm{{ hunt.id }}">
+                              <button type="submit" class="btn btn-danger" id="deleteHuntBtn{{ hunt.id }}">
+                                <i class="fas fa-trash"></i> Delete Hunt
+                              </button>
+                            </form>
+                            <script>
+                              document.getElementById('deleteHuntForm{{ hunt.id }}').addEventListener('submit', function() {
+                                const btn = document.getElementById('deleteHuntBtn{{ hunt.id }}');
+                                btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Deleting...';
+                                btn.disabled = true;
+                              });
+                            </script>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          
+          <div class="mt-3 d-flex justify-content-between">
+            <div>
+              <a href="{{ url_for('compare') }}" class="btn btn-success">
+                <i class="fas fa-exchange-alt"></i> Compare Hunts
+              </a>
+              
+              <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#reprocessModal">
+                <i class="fas fa-sync"></i> Reprocess Samples
+              </button>
+              
+              <form action="{{ url_for('reprocess_samples') }}" method="post" class="d-inline ms-2">
+                <button type="submit" class="btn btn-outline-info">
+                  <i class="fas fa-clock"></i> Update Timeframes
+                </button>
+              </form>
+            </div>
+            
+            <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#clearDataModal">
+              <i class="fas fa-trash"></i> Clear All Data
+            </button>
+          </div>
+          
+          <!-- Reprocess Samples Modal -->
+          <div class="modal fade" id="reprocessModal" tabindex="-1" aria-labelledby="reprocessModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title" id="reprocessModalLabel">Confirm Sample Reprocessing</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                  <p class="text-info"><i class="fas fa-info-circle"></i> <strong>Info:</strong> This will reprocess all samples across all hunts to ensure label counts are accurate.</p>
+                  <p>This is useful when hunt stats show incorrect labeled/unlabeled counts or when samples appear to be missing.</p>
+                  <p>The operation may take a while depending on the number of hunts and samples.</p>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                  <form action="{{ url_for('reprocess_samples') }}" method="post" id="reprocessForm">
+                    <button type="submit" class="btn btn-primary" id="reprocessBtn">
+                      <i class="fas fa-sync"></i> Reprocess Samples
+                    </button>
+                  </form>
+                  <script>
+                    document.getElementById('reprocessForm').addEventListener('submit', function() {
+                      const btn = document.getElementById('reprocessBtn');
+                      btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Reprocessing...';
+                      btn.disabled = true;
+                    });
+                  </script>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Clear Data Modal -->
+          <div class="modal fade" id="clearDataModal" tabindex="-1" aria-labelledby="clearDataModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title" id="clearDataModalLabel">Confirm Data Reset</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                  <p class="text-danger"><i class="fas fa-exclamation-triangle"></i> <strong>Warning:</strong> This will delete all your hunt data, including categorized true positives and false positives.</p>
+                  <p>Are you sure you want to reset all data?</p>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                  <form action="{{ url_for('clear_data') }}" method="post">
+                    <button type="submit" class="btn btn-danger">
+                      <i class="fas fa-trash"></i> Reset All Data
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        {% else %}
+          <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> No hunts added yet. Add a hunt to get started.
+          </div>
+          
+          <div class="mt-3 text-end">
+            <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#clearDataModal">
+              <i class="fas fa-trash"></i> Clear All Data
+            </button>
+          </div>
+          
+          <!-- Clear Data Modal -->
+          <div class="modal fade" id="clearDataModal" tabindex="-1" aria-labelledby="clearDataModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title" id="clearDataModalLabel">Confirm Data Reset</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                  <p class="text-danger"><i class="fas fa-exclamation-triangle"></i> <strong>Warning:</strong> This will delete all data, including any categorized true positives and false positives.</p>
+                  <p>Are you sure you want to reset all data?</p>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                  <form action="{{ url_for('clear_data') }}" method="post">
+                    <button type="submit" class="btn btn-danger">
+                      <i class="fas fa-trash"></i> Reset All Data
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

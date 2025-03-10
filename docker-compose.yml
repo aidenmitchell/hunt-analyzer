@@ -1,0 +1,17 @@
+version: '3'
+
+services:
+  hunt-analyzer:
+    # Use image instead of build for easy GitHub integration
+    image: ${DOCKER_REGISTRY:-ghcr.io}/${GITHUB_USERNAME:-yourusername}/hunt-analyzer:${TAG:-latest}
+    container_name: hunt-analyzer
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    environment:
+      # You can set your API token here, or leave it blank to enter it through the UI
+      - SUBLIME_API_TOKEN=
+      # Generate a random secret key or set a fixed one
+      - SECRET_KEY=change_this_to_a_random_string

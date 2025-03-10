@@ -1,0 +1,665 @@
+{% extends "base.html" %}
+
+{% block title %}Analyze Hunt{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+  <div class="col-12">
+    {% if counts_mismatch %}
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+      <strong>Sample counts might be inaccurate!</strong> The stored count doesn't match the actual samples.
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      <div class="mt-2">
+        <form action="{{ url_for('reprocess_samples') }}" method="post" class="d-inline">
+          <button type="submit" class="btn btn-sm btn-info">
+            <i class="fas fa-sync"></i> Reprocess Samples
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+    
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2>Analyzing: {{ hunt.name }}</h2>
+      <div>
+        <a href="{{ url_for('hunts') }}" class="btn btn-secondary">
+          <i class="fas fa-arrow-left"></i> Back to Hunts
+        </a>
+        <a href="{{ url_for('compare') }}" class="btn btn-success" id="compare-button" 
+           {% if hunt.true_positives_count + hunt.false_positives_count < message_groups|length %}
+           onclick="alert('Please label all samples before comparing'); return false;"
+           {% endif %}>
+          <i class="fas fa-exchange-alt"></i> Compare Hunts
+        </a>
+      </div>
+    </div>
+    
+    <div class="progress mb-3">
+      <div class="progress-bar bg-success" role="progressbar" 
+           style="width: {{ (hunt.true_positives_count / message_groups|length * 100) if message_groups|length > 0 else 0 }}%" 
+           aria-valuenow="{{ hunt.true_positives_count }}" aria-valuemin="0" aria-valuemax="{{ message_groups|length }}">
+        {{ hunt.true_positives_count }} TP
+      </div>
+      <div class="progress-bar bg-danger" role="progressbar" 
+           style="width: {{ (hunt.false_positives_count / message_groups|length * 100) if message_groups|length > 0 else 0 }}%" 
+           aria-valuenow="{{ hunt.false_positives_count }}" aria-valuemin="0" aria-valuemax="{{ message_groups|length }}">
+        {{ hunt.false_positives_count }} FP
+      </div>
+    </div>
+    
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <small class="text-muted">
+          Total samples: {{ message_groups|length }} | 
+          {% if show_all_messages %}
+            Categorized: {{ hunt.true_positives_count + hunt.false_positives_count }} / {{ hunt.total_samples }} 
+            ({{ ((hunt.true_positives_count + hunt.false_positives_count) / hunt.total_samples * 100)|round(1) }}%)
+          {% else %}
+            New Samples Categorized: {{ hunt.labeled_new_samples }} / {{ hunt.total_new_samples }} 
+            ({{ (hunt.labeled_new_samples / hunt.total_new_samples * 100)|round(1) if hunt.total_new_samples > 0 else 100 }}%)
+          {% endif %}
+        </small>
+      </div>
+      
+      <div>
+        {% if hunt.pre_labeled_count > 0 %}
+          {% if show_all_messages %}
+            <a href="{{ url_for('analyze_hunt', hunt_id=hunt.id, show_all=0) }}" class="btn btn-sm btn-outline-primary">
+              <i class="fas fa-filter"></i> Hide Pre-labeled ({{ hunt.pre_labeled_count }})
+            </a>
+          {% else %}
+            <a href="{{ url_for('analyze_hunt', hunt_id=hunt.id, show_all=1) }}" class="btn btn-sm btn-outline-primary">
+              <i class="fas fa-list"></i> Show All ({{ hunt.total_samples }})
+            </a>
+          {% endif %}
+        {% endif %}
+        
+        {% if hunt.unlabeled_count <= 0 %}
+          <span class="badge bg-success">Fully Labeled</span>
+        {% else %}
+          <span class="badge bg-warning text-dark">{{ hunt.unlabeled_count }} Need Labeling</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Message List View -->
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header bg-primary text-white">
+        <div class="d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">Message List</h5>
+          <div class="mass-action-buttons">
+            <button type="button" id="btn-select-all" class="btn btn-sm btn-light me-2">
+              <i class="fas fa-check-square"></i> Select All
+            </button>
+            <button type="button" id="btn-select-unlabeled" class="btn btn-sm btn-light me-2">
+              <i class="fas fa-check-square"></i> Select Unlabeled
+            </button>
+            <button type="button" id="btn-clear-selection" class="btn btn-sm btn-light me-3">
+              <i class="fas fa-square"></i> Clear Selection
+            </button>
+            
+            <div class="btn-group">
+              <button type="button" id="btn-mass-tp" class="btn btn-sm btn-success">
+                <i class="fas fa-check"></i> Mark Selected as TP
+              </button>
+              <button type="button" id="btn-mass-fp" class="btn btn-sm btn-danger">
+                <i class="fas fa-times"></i> Mark Selected as FP
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover table-sm mb-0">
+            <thead>
+              <tr>
+                <th width="40">
+                  <input type="checkbox" class="form-check-input" id="check-select-all">
+                </th>
+                <th width="40">Status</th>
+                <th>Subject</th>
+                <th>Sender</th>
+                <th>Rules</th>
+                <th width="130">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for msg in message_groups %}
+              <tr data-id="{{ msg.id }}" class="{% if msg.status == 'true_positive' %}table-success{% elif msg.status == 'false_positive' %}table-danger{% endif %} {% if msg.pre_labeled %}pre-labeled-row{% endif %}">
+                <td>
+                  <input type="checkbox" class="form-check-input msg-checkbox" data-id="{{ msg.id }}">
+                </td>
+                <td>
+                  {% if msg.status == 'true_positive' %}
+                    <span class="badge bg-success">TP</span>
+                  {% elif msg.status == 'false_positive' %}
+                    <span class="badge bg-danger">FP</span>
+                  {% else %}
+                    <span class="badge bg-secondary">-</span>
+                  {% endif %}
+                  {% if msg.pre_labeled %}
+                    <i class="fas fa-tag text-muted" title="Pre-labeled"></i>
+                  {% endif %}
+                </td>
+                <td>
+                  <a href="#" class="view-details" data-id="{{ msg.id }}">
+                    {{ msg.subject }}
+                  </a>
+                </td>
+                <td>{{ msg.sender.split('<')[0] }}</td>
+                <td>
+                  <small>
+                    {% for rule in msg.rules[:2] %}
+                      {{ rule }}{% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                    {% if msg.rules_count > 2 %}...and {{ msg.rules_count - 2 }} more{% endif %}
+                  </small>
+                </td>
+                <td>
+                  <div class="btn-group btn-group-sm">
+                    <a href="{{ msg.message_link }}" target="_blank" class="btn btn-info btn-sm" title="View in Sublime">
+                      <i class="fas fa-external-link-alt"></i>
+                    </a>
+                    {% if not msg.status %}
+                      <button type="button" class="btn btn-success btn-sm btn-tp" 
+                              onclick="labelMessage('{{ msg.id }}', '{{ hunt.id }}', '{{ msg.subject|replace("'", "\\'") }}', 'true_positive')"
+                              title="Mark as True Positive">
+                        <i class="fas fa-check"></i>
+                      </button>
+                      <button type="button" class="btn btn-danger btn-sm btn-fp" 
+                              onclick="labelMessage('{{ msg.id }}', '{{ hunt.id }}', '{{ msg.subject|replace("'", "\\'") }}', 'false_positive')"
+                              title="Mark as False Positive">
+                        <i class="fas fa-times"></i>
+                      </button>
+                    {% else %}
+                      <button type="button" class="btn btn-secondary btn-sm btn-toggle" 
+                              onclick="labelMessage('{{ msg.id }}', '{{ hunt.id }}', '{{ msg.subject|replace("'", "\\'") }}', '{{ 'false_positive' if msg.status == 'true_positive' else 'true_positive' }}')"
+                              title="Change Label">
+                        <i class="fas fa-exchange-alt"></i>
+                      </button>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card-footer">
+        <small class="text-muted">Selected: <span id="selected-count">0</span> messages</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Message Detail Modal -->
+<div class="modal fade" id="detailModal" tabindex="-1" aria-labelledby="detailModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="detailModalLabel">Message Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="detailModalBody">
+        <!-- Message details will be loaded here -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+  // Constants
+  const huntId = "{{ hunt.id }}";
+  const totalMessages = {{ message_groups|length }};
+  let tpCount = {{ hunt.true_positives_count }};
+  let fpCount = {{ hunt.false_positives_count }};
+
+  // ======= SELECTION HANDLING =======
+  
+  // Handle the select all checkbox in table header
+  $("#check-select-all").on("change", function() {
+    $(".msg-checkbox").prop("checked", $(this).prop("checked"));
+    updateSelectedCount();
+  });
+  
+  // Handle individual message checkboxes
+  $(".msg-checkbox").on("change", function() {
+    updateSelectedCount();
+  });
+  
+  // Select all button
+  $("#btn-select-all").on("click", function() {
+    $(".msg-checkbox").prop("checked", true);
+    $("#check-select-all").prop("checked", true);
+    updateSelectedCount();
+  });
+  
+  // Select unlabeled button
+  $("#btn-select-unlabeled").on("click", function() {
+    $(".msg-checkbox").prop("checked", false);
+    
+    $(".msg-checkbox").each(function() {
+      const $row = $(this).closest("tr");
+      if (!$row.hasClass("table-success") && !$row.hasClass("table-danger")) {
+        $(this).prop("checked", true);
+      }
+    });
+    
+    updateSelectedCount();
+  });
+  
+  // Clear selection button
+  $("#btn-clear-selection").on("click", function() {
+    $(".msg-checkbox").prop("checked", false);
+    $("#check-select-all").prop("checked", false);
+    updateSelectedCount();
+  });
+  
+  // Update selected count
+  function updateSelectedCount() {
+    const count = $(".msg-checkbox:checked").length;
+    $("#selected-count").text(count);
+  }
+  
+  // ======= MESSAGE DETAILS MODAL =======
+  
+  // Show message details in modal
+  $(".view-details").on("click", function(e) {
+    e.preventDefault();
+    
+    const msgId = $(this).data("id");
+    const $row = $("tr[data-id='" + msgId + "']");
+    
+    const subject = $(this).text().trim();
+    const sender = $row.find("td:eq(3)").text().trim();
+    const rules = $row.find("td:eq(4)").text().trim();
+    const messageUrl = $row.find("td:eq(5) a").attr("href");
+    
+    let status = "Unlabeled";
+    let statusClass = "secondary";
+    
+    if ($row.hasClass("table-success")) {
+      status = "True Positive";
+      statusClass = "success";
+    } else if ($row.hasClass("table-danger")) {
+      status = "False Positive";
+      statusClass = "danger";
+    }
+    
+    const content = `
+      <div class="card border-0">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">${subject}</h5>
+          <span class="badge bg-${statusClass}">${status}</span>
+        </div>
+        <div class="card-body">
+          <p><strong>From:</strong> ${sender}</p>
+          <p><strong>Flagged Rules:</strong> ${rules}</p>
+          <div class="mt-3">
+            <a href="${messageUrl}" target="_blank" class="btn btn-info">
+              <i class="fas fa-external-link-alt"></i> View in Sublime
+            </a>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    $("#detailModalBody").html(content);
+    $("#detailModal").modal("show");
+  });
+  
+  // ======= SINGLE MESSAGE LABELING =======
+  
+  window.labelMessage = function(msgId, huntId, subject, category) {
+    // Find the button and disable it
+    const $row = $("tr[data-id='" + msgId + "']");
+    const $buttons = $row.find("button");
+    $buttons.prop("disabled", true);
+    
+    // Send AJAX request
+    $.ajax({
+      url: "{{ url_for('categorize') }}",
+      type: "POST",
+      data: {
+        msg_id: msgId,
+        hunt_id: huntId,
+        subject: subject,
+        category: category
+      },
+      success: function(response) {
+        if (response.status === "success") {
+          // Update row styling
+          $row.removeClass("table-success table-danger");
+          
+          // Update status badge and counts
+          let statusHtml = "";
+          
+          // Properly update counts
+          if (category === "true_positive") {
+            // If changing from FP to TP, subtract from FP count and add to TP count
+            if ($row.hasClass("table-danger")) {
+              fpCount--;
+              tpCount++;
+            } 
+            // If new labeling (wasn't labeled before), just add to TP
+            else if (!$row.hasClass("table-success")) {
+              tpCount++;
+            }
+            
+            // Update row style and badge
+            $row.addClass("table-success");
+            statusHtml = '<span class="badge bg-success">TP</span>';
+          } else {
+            // If changing from TP to FP, subtract from TP count and add to FP count
+            if ($row.hasClass("table-success")) {
+              tpCount--;
+              fpCount++;
+            }
+            // If new labeling (wasn't labeled before), just add to FP
+            else if (!$row.hasClass("table-danger")) {
+              fpCount++;
+            }
+            
+            // Update row style and badge
+            $row.addClass("table-danger");
+            statusHtml = '<span class="badge bg-danger">FP</span>';
+          }
+          
+          // Add pre-labeled icon if needed
+          if ($row.hasClass("pre-labeled-row")) {
+            statusHtml += ' <i class="fas fa-tag text-muted" title="Pre-labeled"></i>';
+          }
+          
+          $row.find("td:eq(1)").html(statusHtml);
+          
+          // Update action buttons
+          const messageUrl = $row.find("td:eq(5) a").attr("href");
+          const buttonsHtml = `
+            <div class="btn-group btn-group-sm">
+              <a href="${messageUrl}" target="_blank" class="btn btn-info btn-sm" title="View in Sublime">
+                <i class="fas fa-external-link-alt"></i>
+              </a>
+              <button type="button" class="btn btn-secondary btn-sm btn-toggle" 
+                      onclick="labelMessage('${msgId}', '${huntId}', '${subject.replace(/'/g, "\\'")}', '${category === "true_positive" ? "false_positive" : "true_positive"}')"
+                      title="Change Label">
+                <i class="fas fa-exchange-alt"></i>
+              </button>
+            </div>
+          `;
+          
+          $row.find("td:eq(5)").html(buttonsHtml);
+          
+          // Update progress bars and stats
+          updateProgressBars();
+          updateStats();
+        } else {
+          // Re-enable buttons and show error
+          $buttons.prop("disabled", false);
+          alert("Error: " + response.message);
+        }
+      },
+      error: function() {
+        // Re-enable buttons and show error
+        $buttons.prop("disabled", false);
+        alert("Failed to categorize message. Please try again.");
+      }
+    });
+  };
+  
+  // ======= MASS LABELING =======
+  
+  // Mass label as True Positive
+  $("#btn-mass-tp").on("click", function() {
+    massLabelMessages("true_positive");
+  });
+  
+  // Mass label as False Positive
+  $("#btn-mass-fp").on("click", function() {
+    massLabelMessages("false_positive");
+  });
+  
+  // Function to handle mass labeling
+  function massLabelMessages(category) {
+    const selectedIds = [];
+    
+    // Collect all selected message IDs
+    $(".msg-checkbox:checked").each(function() {
+      selectedIds.push($(this).data("id"));
+    });
+    
+    if (selectedIds.length === 0) {
+      alert("Please select at least one message to label");
+      return;
+    }
+    
+    // Confirm for large batches
+    if (selectedIds.length > 10) {
+      if (!confirm(`Are you sure you want to label ${selectedIds.length} messages as ${category === "true_positive" ? "True Positives" : "False Positives"}?`)) {
+        return;
+      }
+    }
+    
+    // Disable buttons during processing
+    $(".mass-action-buttons button").prop("disabled", true);
+    
+    // Send AJAX request
+    $.ajax({
+      url: "{{ url_for('mass_categorize') }}",
+      type: "POST",
+      data: {
+        'hunt_id': huntId,
+        'message_ids[]': selectedIds,
+        'category': category
+      },
+      success: function(response) {
+        if (response.status === "success") {
+          // Update UI for each selected row
+          $(".msg-checkbox:checked").each(function() {
+            const msgId = $(this).data("id");
+            const $row = $("tr[data-id='" + msgId + "']");
+            const subject = $row.find("td:eq(2) a").text().trim().replace(/'/g, "\\'");
+            
+            // Update row class
+            $row.removeClass("table-success table-danger");
+            
+            // Update status badge
+            let statusHtml = "";
+            if (category === "true_positive") {
+              $row.addClass("table-success");
+              statusHtml = '<span class="badge bg-success">TP</span>';
+            } else {
+              $row.addClass("table-danger");
+              statusHtml = '<span class="badge bg-danger">FP</span>';
+            }
+            
+            // Add pre-labeled icon if needed
+            if ($row.hasClass("pre-labeled-row")) {
+              statusHtml += ' <i class="fas fa-tag text-muted" title="Pre-labeled"></i>';
+            }
+            
+            $row.find("td:eq(1)").html(statusHtml);
+            
+            // Update action buttons
+            const messageUrl = $row.find("td:eq(5) a").attr("href");
+            const buttonsHtml = `
+              <div class="btn-group btn-group-sm">
+                <a href="${messageUrl}" target="_blank" class="btn btn-info btn-sm" title="View in Sublime">
+                  <i class="fas fa-external-link-alt"></i>
+                </a>
+                <button type="button" class="btn btn-secondary btn-sm btn-toggle" 
+                        onclick="labelMessage('${msgId}', '${huntId}', '${subject}', '${category === "true_positive" ? "false_positive" : "true_positive"}')"
+                        title="Change Label">
+                  <i class="fas fa-exchange-alt"></i>
+                </button>
+              </div>
+            `;
+            
+            $row.find("td:eq(5)").html(buttonsHtml);
+          });
+          
+          // Need to properly track counts when mass labeling
+          // First count how many changes were made in each direction
+          let tpAdded = 0;
+          let fpAdded = 0;
+          let tpRemoved = 0;
+          let fpRemoved = 0;
+          
+          $(".msg-checkbox:checked").each(function() {
+            const $row = $(this).closest("tr");
+            
+            if (category === "true_positive") {
+              if ($row.hasClass("table-danger")) {
+                // Changed from FP to TP
+                fpRemoved++;
+                tpAdded++;
+              } else if (!$row.hasClass("table-success")) {
+                // New TP
+                tpAdded++;
+              }
+            } else { // false_positive
+              if ($row.hasClass("table-success")) {
+                // Changed from TP to FP
+                tpRemoved++;
+                fpAdded++;
+              } else if (!$row.hasClass("table-danger")) {
+                // New FP
+                fpAdded++;
+              }
+            }
+          });
+          
+          // Update the counts
+          tpCount = tpCount + tpAdded - tpRemoved;
+          fpCount = fpCount + fpAdded - fpRemoved;
+          
+          // Update UI elements
+          updateProgressBars();
+          updateStats();
+          
+          // Uncheck all checkboxes
+          $(".msg-checkbox").prop("checked", false);
+          $("#check-select-all").prop("checked", false);
+          updateSelectedCount();
+          
+          // Show success notification
+          const notification = `
+            <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+              Successfully labeled ${response.successful_count} messages.
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          `;
+          
+          $(".card-header").after(notification);
+          
+          // Auto-dismiss after 3 seconds
+          setTimeout(function() {
+            $(".alert-success").alert("close");
+          }, 3000);
+        } else {
+          alert("Error: " + response.message);
+        }
+        
+        // Re-enable buttons
+        $(".mass-action-buttons button").prop("disabled", false);
+      },
+      error: function() {
+        alert("Failed to categorize messages. Please try again.");
+        $(".mass-action-buttons button").prop("disabled", false);
+      }
+    });
+  }
+  
+  // ======= UI UPDATES =======
+  
+  // Function to update progress bars
+  function updateProgressBars() {
+    // Double-check our counts match the actual number of rows with each class
+    // This ensures the UI always stays in sync
+    const actualTpCount = $(".table-success").length;
+    const actualFpCount = $(".table-danger").length;
+    
+    // Update our variables if they're out of sync
+    if (tpCount !== actualTpCount) {
+      console.log("TP count was out of sync: ", tpCount, actualTpCount);
+      tpCount = actualTpCount;
+    }
+    
+    if (fpCount !== actualFpCount) {
+      console.log("FP count was out of sync: ", fpCount, actualFpCount);
+      fpCount = actualFpCount;
+    }
+    
+    // Update TP bar
+    $(".progress-bar.bg-success").attr("aria-valuenow", tpCount);
+    $(".progress-bar.bg-success").css("width", (tpCount / totalMessages * 100) + "%");
+    $(".progress-bar.bg-success").text(tpCount + " TP");
+    
+    // Update FP bar
+    $(".progress-bar.bg-danger").attr("aria-valuenow", fpCount);
+    $(".progress-bar.bg-danger").css("width", (fpCount / totalMessages * 100) + "%");
+    $(".progress-bar.bg-danger").text(fpCount + " FP");
+  }
+  
+  // Function to update stats text
+  function updateStats() {
+    const totalCategorized = tpCount + fpCount;
+    
+    {% if show_all_messages %}
+      // When showing all messages (including pre-labeled)
+      const percentCategorized = (totalCategorized / totalMessages * 100).toFixed(1);
+      $(".text-muted:first").html(`Categorized: ${totalCategorized} / ${totalMessages} (${percentCategorized}%)`);
+    {% else %}
+      // When showing only new messages (excluding pre-labeled)
+      const totalNewSamples = totalMessages - {{ hunt.pre_labeled_count }};
+      const labeledNewSamples = totalCategorized - {{ hunt.pre_labeled_count }};
+      const percentCategorized = (totalNewSamples > 0) ? 
+                                (labeledNewSamples / totalNewSamples * 100).toFixed(1) : "100.0";
+      $(".text-muted:first").html(`New Samples Categorized: ${labeledNewSamples} / ${totalNewSamples} (${percentCategorized}%)`);
+    {% endif %}
+  }
+  
+  // ======= KEYBOARD SHORTCUTS =======
+  
+  // Add keyboard shortcuts
+  $(document).keydown(function(e) {
+    if (e.ctrlKey && e.which === 65) { // Ctrl+A
+      e.preventDefault();
+      $("#btn-select-all").click();
+    }
+    else if (e.ctrlKey && e.which === 85) { // Ctrl+U
+      e.preventDefault();
+      $("#btn-select-unlabeled").click();
+    }
+  });
+  
+  // Add shortcut help text
+  const helpText = `
+    <div class="mt-4">
+      <h5>Keyboard Shortcuts</h5>
+      <div class="row">
+        <div class="col-md-6">
+          <ul class="list-unstyled">
+            <li><kbd>Ctrl+A</kbd> Select all messages</li>
+            <li><kbd>Ctrl+U</kbd> Select unlabeled messages</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  $(".card-footer").append(helpText);
+});
+</script>
+{% endblock %}
