@@ -166,33 +166,33 @@ def index():
     # Check if user is already logged in
     if 'username' in session and 'api_token' in session:
         return redirect(url_for('hunts'))
-        
-    # Check if API token is in environment variables
-    api_token = os.environ.get('SUBLIME_API_TOKEN')
-    if api_token and 'username' in session:
-        # Set the token in session
-        try:
-            analyzer = HuntAnalyzer(api_token)
-            # Just a small request to test if token works
-            session['api_token'] = api_token
-            flash('API token loaded from environment variables!', 'success')
-            return redirect(url_for('hunts'))
-        except Exception as e:
-            flash(f'Error with environment API token: {str(e)}', 'danger')
     
-    return render_template('index.html')
+    # Get API token from environment variables
+    api_token = os.environ.get('SUBLIME_API_TOKEN')
+    has_env_token = bool(api_token and api_token.strip())
+    
+    return render_template('index.html', has_env_token=has_env_token)
 
 @app.route('/set_token', methods=['POST'])
 def set_token():
     """Set the username and API token."""
     username = request.form.get('username', '').strip()
     api_token = request.form.get('api_token', '').strip()
+    use_env_token = request.form.get('use_env_token') == 'on'
     
     if not username:
         flash('Username cannot be empty!', 'danger')
         return redirect(url_for('index'))
-        
-    if not api_token:
+    
+    # Use environment token if requested
+    if use_env_token:
+        env_token = os.environ.get('SUBLIME_API_TOKEN', '').strip()
+        if env_token:
+            api_token = env_token
+        else:
+            flash('No API token found in environment variables!', 'danger')
+            return redirect(url_for('index'))
+    elif not api_token:
         flash('API token cannot be empty!', 'danger')
         return redirect(url_for('index'))
     
@@ -202,7 +202,12 @@ def set_token():
         # Just a small request to test if token works
         session['api_token'] = api_token
         session['username'] = username
-        flash(f'Welcome, {username}! API token set successfully!', 'success')
+        
+        if use_env_token:
+            flash(f'Welcome, {username}! Using API token from environment variables.', 'success')
+        else:
+            flash(f'Welcome, {username}! API token set successfully!', 'success')
+            
         return redirect(url_for('hunts'))
     except Exception as e:
         flash(f'Error: {str(e)}', 'danger')
@@ -1371,4 +1376,4 @@ def compare_hunts():
         return redirect(url_for('compare'))
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=True)

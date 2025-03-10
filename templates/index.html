@@ -13,17 +13,26 @@
         <p class="card-text">This tool helps you analyze and compare Sublime Security hunt results to improve your detection rules.</p>
         
         <h5 class="mt-4">Login</h5>
-        <p>To get started, please enter your username and Sublime Security API token:</p>
+        <p>To get started, please enter your username{% if not has_env_token %} and Sublime Security API token{% endif %}:</p>
         
         <form action="{{ url_for('set_token') }}" method="post">
           <div class="mb-3">
             <label for="username" class="form-label">Username</label>
             <input type="text" class="form-control" id="username" name="username" placeholder="Enter your username" required>
           </div>
+          
+          {% if has_env_token %}
+          <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> Using API token from environment variables
+            <input type="hidden" name="use_env_token" value="on">
+          </div>
+          {% else %}
           <div class="mb-3">
             <label for="api_token" class="form-label">API Token</label>
             <input type="password" class="form-control" id="api_token" name="api_token" placeholder="Enter your API token" required>
           </div>
+          {% endif %}
+          
           <button type="submit" class="btn btn-primary">Login</button>
         </form>
       </div>
@@ -35,7 +44,7 @@
       </div>
       <div class="card-body">
         <ol>
-          <li>Enter your Sublime Security API token</li>
+          <li>Log in with your username{% if not has_env_token %} and Sublime Security API token{% endif %}</li>
           <li>Add hunts to analyze by providing their IDs</li>
           <li>Evaluate messages by categorizing them as true or false positives</li>
           <li>Compare hunts to track your rule improvements</li>
