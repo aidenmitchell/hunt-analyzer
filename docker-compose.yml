@@ -11,7 +11,6 @@ services:
       - ./data:/app/data
     restart: unless-stopped
     environment:
-      # You can set your API token here, or leave it blank to enter it through the UI
-      - SUBLIME_API_TOKEN=
-      # Generate a random secret key or set a fixed one
-      - SECRET_KEY=change_this_to_a_random_string
+      # Environment variables with explicit syntax for better Portainer compatibility
+      SUBLIME_API_TOKEN: "${SUBLIME_API_TOKEN:-}"
+      SECRET_KEY: "${SECRET_KEY:-change_this_to_a_random_string}"
