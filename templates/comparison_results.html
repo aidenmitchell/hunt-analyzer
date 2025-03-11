@@ -46,6 +46,53 @@
     color: #dc3545 !important;
   }
 </style>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Add event listeners to all switch classification buttons
+    document.querySelectorAll('.switch-classification-btn').forEach(button => {
+      button.addEventListener('click', function() {
+        const msgId = this.getAttribute('data-msg-id');
+        const huntId = this.getAttribute('data-hunt-id');
+        const subject = this.getAttribute('data-subject');
+        const currentCategory = this.getAttribute('data-current-category');
+        const newCategory = this.getAttribute('data-new-category');
+        
+        // Confirm the change
+        if (confirm(`Are you sure you want to change "${subject}" from ${currentCategory.replace('_', ' ')} to ${newCategory.replace('_', ' ')}?`)) {
+          switchClassification(msgId, huntId, subject, newCategory);
+        }
+      });
+    });
+    
+    // Function to send the categorization update to the server
+    function switchClassification(msgId, huntId, subject, category) {
+      const formData = new FormData();
+      formData.append('msg_id', msgId);
+      formData.append('hunt_id', huntId);
+      formData.append('subject', subject);
+      formData.append('category', category);
+      
+      fetch('/categorize', {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.status === 'success') {
+          alert('Classification updated successfully! The hunt statistics will be updated.');
+          // Refresh the page to see the changes
+          window.location.reload();
+        } else {
+          alert('Error: ' + data.message);
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Error updating classification. Please try again.');
+      });
+    }
+  });
+</script>
 {% endblock %}
 
 {% block content %}
@@ -267,6 +314,14 @@
                       <a href="https://platform.sublime.security/messages/{{ tp.id }}" target="_blank" class="btn btn-sm btn-info">
                         <i class="fas fa-external-link-alt"></i> View
                       </a>
+                      <button type="button" class="btn btn-sm btn-warning switch-classification-btn" 
+                        data-msg-id="{{ tp.id }}" 
+                        data-hunt-id="{{ comparison.curr_hunt.id }}" 
+                        data-subject="{{ tp.curr_subject }}" 
+                        data-current-category="true_positive" 
+                        data-new-category="false_positive">
+                        <i class="fas fa-exchange-alt"></i> Switch to FP
+                      </button>
                     </td>
                   </tr>
                   {% endfor %}
@@ -310,6 +365,14 @@
                       <a href="https://platform.sublime.security/messages/{{ tp.id }}" target="_blank" class="btn btn-sm btn-info">
                         <i class="fas fa-external-link-alt"></i> View
                       </a>
+                      <button type="button" class="btn btn-sm btn-warning switch-classification-btn" 
+                        data-msg-id="{{ tp.id }}" 
+                        data-hunt-id="{{ comparison.curr_hunt.id }}" 
+                        data-subject="{{ tp.subject }}" 
+                        data-current-category="true_positive" 
+                        data-new-category="false_positive">
+                        <i class="fas fa-exchange-alt"></i> Switch to FP
+                      </button>
                     </td>
                   </tr>
                   {% endfor %}
@@ -396,6 +459,14 @@
                       <a href="https://platform.sublime.security/messages/{{ tp.id }}" target="_blank" class="btn btn-sm btn-info">
                         <i class="fas fa-external-link-alt"></i> View
                       </a>
+                      <button type="button" class="btn btn-sm btn-warning switch-classification-btn" 
+                        data-msg-id="{{ tp.id }}" 
+                        data-hunt-id="{{ comparison.prev_hunt.id }}" 
+                        data-subject="{{ tp.subject }}" 
+                        data-current-category="true_positive" 
+                        data-new-category="false_positive">
+                        <i class="fas fa-exchange-alt"></i> Switch to FP
+                      </button>
                     </td>
                   </tr>
                   {% endfor %}
@@ -443,6 +514,14 @@
                       <a href="https://platform.sublime.security/messages/{{ tp.id }}" target="_blank" class="btn btn-sm btn-info">
                         <i class="fas fa-external-link-alt"></i> View
                       </a>
+                      <button type="button" class="btn btn-sm btn-warning switch-classification-btn" 
+                        data-msg-id="{{ tp.id }}" 
+                        data-hunt-id="{{ tp.hunt_id }}" 
+                        data-subject="{{ tp.subject }}" 
+                        data-current-category="true_positive" 
+                        data-new-category="false_positive">
+                        <i class="fas fa-exchange-alt"></i> Switch to FP
+                      </button>
                     </td>
                   </tr>
                   {% endfor %}
@@ -486,6 +565,14 @@
                       <a href="https://platform.sublime.security/messages/{{ fp.id }}" target="_blank" class="btn btn-sm btn-info">
                         <i class="fas fa-external-link-alt"></i> View
                       </a>
+                      <button type="button" class="btn btn-sm btn-success switch-classification-btn" 
+                        data-msg-id="{{ fp.id }}" 
+                        data-hunt-id="{{ comparison.curr_hunt.id }}" 
+                        data-subject="{{ fp.curr_subject }}" 
+                        data-current-category="false_positive" 
+                        data-new-category="true_positive">
+                        <i class="fas fa-exchange-alt"></i> Switch to TP
+                      </button>
                     </td>
                   </tr>
                   {% endfor %}
