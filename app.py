@@ -870,7 +870,8 @@ def analyze_hunt(hunt_id):
                 'subject': subject,
                 'status': status,
                 'pre_labeled': pre_labeled,
-                'message_link': f"https://platform.sublime.security/messages/{msg_id}"
+                'message_link': f"https://platform.sublime.security/messages/{msg_id}",
+                'attack_score_verdict': message_group.get('attack_score_verdict', 'unknown')
             }
             
             # Add sender info if available
