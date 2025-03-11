@@ -126,8 +126,7 @@
                   <input type="checkbox" class="form-check-input" id="check-select-all">
                 </th>
                 <th width="40" class="sortable" data-sort="status">Status</th>
-                <th class="sortable" data-sort="subject">Subject</th>
-                <th class="sortable" data-sort="sender">Sender</th>
+                <th class="sortable" data-sort="subject">Subject / Sender</th>
                 <th width="100" class="sortable" data-sort="attack-score">Attack Score</th>
                 <th class="sortable" data-sort="rules">Rules</th>
                 <th width="130">Actions</th>
@@ -161,8 +160,8 @@
                   <a href="#" class="view-details" data-id="{{ msg.id }}">
                     {{ msg.subject }}
                   </a>
+                  <div class="sender-email text-muted small">{{ msg.sender }}</div>
                 </td>
-                <td>{{ msg.sender.split('<')[0] }}</td>
                 <td>
                   {% set verdict_colors = {
                     'likely_benign': '#B58FF5',
@@ -295,6 +294,18 @@ document.head.insertAdjacentHTML('beforeend', `
     tbody tr:hover {
       background-color: rgba(0, 123, 255, 0.05);
     }
+    
+    /* Sender email styling */
+    .sender-email {
+      color: #6c757d;
+      font-size: 0.85em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+      display: block;
+      margin-top: 2px;
+    }
   </style>
 `);
 
@@ -415,9 +426,9 @@ $(document).ready(function() {
     const $row = $("tr[data-id='" + msgId + "']");
     
     const subject = $(this).text().trim();
-    const sender = $row.find("td:eq(3)").text().trim();
-    const rules = $row.find("td:eq(4)").text().trim();
-    const messageUrl = $row.find("td:eq(5) a").attr("href");
+    const sender = $row.find(".sender-email").text().trim();
+    const rules = $row.find("td:eq(3)").text().trim();
+    const messageUrl = $row.find("td:eq(4) a").attr("href");
     
     let status = "Unlabeled";
     let statusClass = "secondary";
@@ -438,7 +449,7 @@ $(document).ready(function() {
         </div>
         <div class="card-body">
           <p><strong>From:</strong> ${sender}</p>
-          <p><strong>Attack Score:</strong> <span class="badge" style="background-color: ${getAttackScoreColor($row.find("td:eq(3) span").text().trim().toLowerCase())}">${$row.find("td:eq(3) span").text().trim()}</span></p>
+          <p><strong>Attack Score:</strong> <span class="badge" style="background-color: ${getAttackScoreColor($row.find("td:eq(2) span").text().trim().toLowerCase())}">${$row.find("td:eq(2) span").text().trim()}</span></p>
           <p><strong>Flagged Rules:</strong> ${rules}</p>
           <div class="mt-3">
             <a href="${messageUrl}" target="_blank" class="btn btn-info">
@@ -602,7 +613,7 @@ $(document).ready(function() {
           $(".msg-checkbox:checked").each(function() {
             const msgId = $(this).data("id");
             const $row = $("tr[data-id='" + msgId + "']");
-            const subject = $row.find("td:eq(2) a").text().trim().replace(/'/g, "\\'");
+            const subject = $row.find("td:eq(1) a").text().trim().replace(/'/g, "\\'");
             
             // Update row class
             $row.removeClass("table-success table-danger");
@@ -625,7 +636,7 @@ $(document).ready(function() {
             $row.find("td:eq(1)").html(statusHtml);
             
             // Update action buttons
-            const messageUrl = $row.find("td:eq(5) a").attr("href");
+            const messageUrl = $row.find("td:eq(4) a").attr("href");
             const buttonsHtml = `
               <div class="btn-group btn-group-sm">
                 <a href="${messageUrl}" target="_blank" class="btn btn-info btn-sm" title="View in Sublime">
