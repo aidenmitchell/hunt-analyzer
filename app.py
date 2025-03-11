@@ -102,11 +102,14 @@ class HuntAnalyzer:
         offset = 0
         limit = 50  # Default API limit
         total_count = None
+        max_iterations = 100  # Safety limit to prevent infinite loops
+        iteration = 0
         
         logger.info(f"Fetching all results for hunt {hunt_id} with pagination")
         
-        while True:
-            logger.debug(f"Fetching results for hunt {hunt_id} with offset={offset}, limit={limit}")
+        while iteration < max_iterations:
+            iteration += 1
+            logger.debug(f"Fetching results for hunt {hunt_id} with offset={offset}, limit={limit} (page {iteration})")
             response = requests.get(
                 f"{self.base_url}/hunt-jobs/{hunt_id}/results?limit={limit}&offset={offset}",
                 headers=self.headers
@@ -122,16 +125,30 @@ class HuntAnalyzer:
             # Set total_count on first iteration if available
             if total_count is None:
                 total_count = response_data.get("total_group_count", 0)
-                logger.info(f"Hunt {hunt_id} has {total_count} total message groups")
+                logger.info(f"Hunt {hunt_id} has reported total_group_count of {total_count} message groups")
+                
+                # The v1 API may incorrectly report total_count as the page size
+                # Continue fetching even if total_count equals limit
             
-            # If we got fewer results than requested or we have all results, we're done
-            if len(message_groups) < limit or len(all_results) >= total_count:
+            # If we received fewer results than requested, we've reached the end
+            if len(message_groups) < limit:
+                logger.info(f"Received {len(message_groups)} messages (less than limit of {limit}), reached end of results")
+                break
+                
+            # If we received no results, stop
+            if len(message_groups) == 0:
+                logger.info(f"Received 0 messages, stopping pagination")
                 break
             
             # Update offset for next batch
             offset += limit
+            logger.debug(f"Updated offset to {offset} for next page")
             
-        logger.info(f"Retrieved {len(all_results)}/{total_count} message groups for hunt {hunt_id}")
+        actual_total = len(all_results)
+        if actual_total != total_count:
+            logger.info(f"Note: API reported {total_count} total messages, but actually retrieved {actual_total}")
+            
+        logger.info(f"Retrieved {actual_total} total message groups for hunt {hunt_id}")
         return all_results
     
     def get_hunt_details(self, hunt_id):
