@@ -89,7 +89,7 @@ class HuntAnalyzer:
     def __init__(self, api_token):
         """Initialize the Hunt Analyzer with API token."""
         self.api_token = api_token
-        self.base_url = "https://platform.sublime.security/v0"
+        self.base_url = "https://platform.sublime.security/v1"
         self.headers = {
             "accept": "application/json",
             "authorization": f"Bearer {self.api_token}",
@@ -97,16 +97,42 @@ class HuntAnalyzer:
         }
     
     def get_hunt_results(self, hunt_id):
-        """Get results of a hunt job."""
-        response = requests.get(
-            f"{self.base_url}/hunt-jobs/{hunt_id}/results",
-            headers=self.headers
-        )
+        """Get results of a hunt job using pagination to ensure all results are fetched."""
+        all_results = []
+        offset = 0
+        limit = 50  # Default API limit
+        total_count = None
         
-        if response.status_code != 200:
-            raise Exception(f"Error getting hunt results: {response.text}")
+        logger.info(f"Fetching all results for hunt {hunt_id} with pagination")
         
-        return response.json().get("message_groups", [])
+        while True:
+            logger.debug(f"Fetching results for hunt {hunt_id} with offset={offset}, limit={limit}")
+            response = requests.get(
+                f"{self.base_url}/hunt-jobs/{hunt_id}/results?limit={limit}&offset={offset}",
+                headers=self.headers
+            )
+            
+            if response.status_code != 200:
+                raise Exception(f"Error getting hunt results: {response.text}")
+            
+            response_data = response.json()
+            message_groups = response_data.get("message_groups", [])
+            all_results.extend(message_groups)
+            
+            # Set total_count on first iteration if available
+            if total_count is None:
+                total_count = response_data.get("total_group_count", 0)
+                logger.info(f"Hunt {hunt_id} has {total_count} total message groups")
+            
+            # If we got fewer results than requested or we have all results, we're done
+            if len(message_groups) < limit or len(all_results) >= total_count:
+                break
+            
+            # Update offset for next batch
+            offset += limit
+            
+        logger.info(f"Retrieved {len(all_results)}/{total_count} message groups for hunt {hunt_id}")
+        return all_results
     
     def get_hunt_details(self, hunt_id):
         """Get details of a hunt job including its time range and MQL source."""
@@ -118,7 +144,15 @@ class HuntAnalyzer:
         if response.status_code != 200:
             raise Exception(f"Error getting hunt details: {response.text}")
         
-        return response.json()
+        hunt_details = response.json()
+        
+        # For v1 API compatibility, check for the correct field containing the MQL source
+        # The v1 API might use different field names
+        if 'mql' in hunt_details and 'source' not in hunt_details:
+            hunt_details['source'] = hunt_details['mql']
+            logger.debug(f"Using 'mql' field as source for hunt {hunt_id}")
+            
+        return hunt_details
     
     def get_subject_from_message_group(self, message_group):
         """Extract subject from a message group."""
