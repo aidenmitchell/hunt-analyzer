@@ -6,6 +6,7 @@ from datetime import datetime
 import requests
 from dotenv import load_dotenv
 from diff_match_patch import diff_match_patch
+import traceback
 
 # Load environment variables from .env file
 load_dotenv()
@@ -1136,8 +1137,8 @@ def mass_categorize():
         results = analyzer.get_hunt_results(hunt_id)
         message_map = {msg['id']: analyzer.get_subject_from_message_group(msg) for msg in results}
     except Exception as e:
-        logger.error(f"Error retrieving hunt results for mass categorization: {str(e)}")
-        return jsonify({'status': 'error', 'message': f'Error retrieving hunt details: {str(e)}'})
+        logger.error(f"Error retrieving hunt results for mass categorization: {traceback.format_exc()}")
+        return jsonify({'status': 'error', 'message': 'An internal error has occurred while retrieving hunt details.'})
     
     # Process each message ID
     successful_ids = []
