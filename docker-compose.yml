@@ -14,6 +14,8 @@ services:
       # Environment variables with explicit syntax for better Portainer compatibility
       SUBLIME_API_TOKEN: "${SUBLIME_API_TOKEN:-}"
       SECRET_KEY: "${SECRET_KEY:-change_this_to_a_random_string}"
+      # Security settings - always disable debug in production
+      FLASK_DEBUG: "False"
 
 volumes:
   hunt_analyzer_data:

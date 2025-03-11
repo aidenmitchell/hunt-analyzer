@@ -1470,4 +1470,7 @@ def compare_hunts():
         return redirect(url_for('compare'))
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Determine if we're in development or production
+    debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() in ('true', '1', 't')
+    # Only enable debug mode in development, never in production
+    app.run(host='0.0.0.0', port=5000, debug=debug_mode)

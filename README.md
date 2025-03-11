@@ -153,19 +153,26 @@ flask run
 
 ### Using Environment Variables
 
-You can set your API token in a `.env` file to avoid entering it manually each time:
+You can set several environment variables in a `.env` file:
 
 1. Create a file named `.env`:
 ```bash
 touch .env
 ```
 
-2. Edit the `.env` file and set your Sublime Security API token:
+2. Edit the `.env` file and set your environment variables:
 ```
+# Required for API access
 SUBLIME_API_TOKEN=your_api_token_here
+
+# Optional security settings
+SECRET_KEY=your_secure_random_key
+FLASK_DEBUG=False  # Only set to True in development environments
 ```
 
-When you start the application, it will automatically use the API token from the `.env` file.
+When you start the application, it will automatically use these environment variables.
+
+> **Security Note**: Always set `FLASK_DEBUG=False` (or leave it unset) in production environments to disable the debug mode, which could expose a debugging console that allows arbitrary code execution.
 
 ## Storage
 
