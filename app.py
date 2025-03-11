@@ -156,8 +156,15 @@ class HuntAnalyzer:
     
     def get_subject_from_message_group(self, message_group):
         """Extract subject from a message group."""
+        # Handle v1 API format
+        if message_group.get("subjects") and len(message_group["subjects"]) > 0:
+            return message_group["subjects"][0]
+        
+        # Fallback to v0 format
         if message_group.get("messages") and len(message_group["messages"]) > 0:
             return message_group["messages"][0].get("subject", "No subject")
+            
+        # If we can't find a subject in either format
         return "No subject"
         
     def parse_timeframe(self, hunt_details):
@@ -849,7 +856,33 @@ def analyze_hunt(hunt_id):
             }
             
             # Add sender info if available
-            if message_group.get('messages') and len(message_group['messages']) > 0:
+            # First try v1 API format
+            if message_group.get('sender_email_addresses') and len(message_group['sender_email_addresses']) > 0:
+                sender_email = message_group['sender_email_addresses'][0]
+                sender_name = "Unknown"
+                
+                # Try to get sender display name from v1 API format
+                if message_group.get('sender_display_name__info') and len(message_group['sender_display_name__info']) > 0:
+                    # Get the first display name from the info object
+                    sender_name = list(message_group['sender_display_name__info'].keys())[0]
+                # Or try from previews
+                elif message_group.get('previews') and len(message_group['previews']) > 0:
+                    sender_name = message_group['previews'][0].get('sender_display_name', 'Unknown')
+                
+                msg_data['sender'] = f"{sender_name} <{sender_email}>"
+                
+                # Get recipients from v1 format
+                if message_group.get('recipients'):
+                    recipients = message_group['recipients']
+                    msg_data['recipients'] = recipients[:3]
+                    msg_data['recipients_count'] = len(recipients)
+                
+                # Get date from v1 format
+                if message_group.get('first_created_at'):
+                    msg_data['date'] = message_group['first_created_at']
+            
+            # Fallback to v0 API format
+            elif message_group.get('messages') and len(message_group['messages']) > 0:
                 message = message_group['messages'][0]
                 sender_name = message.get('sender', {}).get('display_name', 'Unknown')
                 sender_email = message.get('sender', {}).get('email', 'unknown@example.com')
@@ -863,7 +896,16 @@ def analyze_hunt(hunt_id):
             
             # Add flagged rules
             flagged_rules = message_group.get('flagged_rules', [])
-            msg_data['rules'] = [rule.get('name') for rule in flagged_rules[:5]]
+            
+            # Handle flagged rules differently based on API version
+            if flagged_rules and isinstance(flagged_rules[0], dict) and 'rule_meta' in flagged_rules[0]:
+                # v1 API format
+                msg_data['rules'] = [rule.get('rule_meta', {}).get('name', 'Unknown Rule') 
+                                    for rule in flagged_rules[:5]]
+            else:
+                # v0 API format
+                msg_data['rules'] = [rule.get('name', 'Unknown Rule') for rule in flagged_rules[:5]]
+                
             msg_data['rules_count'] = len(flagged_rules)
             
             message_groups.append(msg_data)
