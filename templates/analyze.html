@@ -256,9 +256,10 @@ function getAttackScoreColor(verdict) {
   return colors[verdict] || '#B1B1B1';
 }
 
-// CSS for sortable headers
+// CSS for sortable headers and checkbox interactions
 document.head.insertAdjacentHTML('beforeend', `
   <style>
+    /* Sortable headers */
     .sortable {
       cursor: pointer;
       position: relative;
@@ -281,6 +282,19 @@ document.head.insertAdjacentHTML('beforeend', `
     .sortable:hover:after {
       color: #fff;
     }
+    
+    /* Checkbox hover effects for shift-click awareness */
+    .msg-checkbox {
+      cursor: pointer;
+      transition: transform 0.1s ease;
+    }
+    .msg-checkbox:hover {
+      transform: scale(1.2);
+    }
+    /* Add a subtle highlight to table rows on hover for better selection visibility */
+    tbody tr:hover {
+      background-color: rgba(0, 123, 255, 0.05);
+    }
   </style>
 `);
 
@@ -300,6 +314,9 @@ $(document).ready(function() {
   // Sort by attack score on page load
   $(".sortable[data-sort='attack-score']").addClass("sorted-asc");
   sortTable('attack-score', 'asc');
+  
+  // Initialize header checkbox state
+  updateSelectedCount();
 
   // ======= SELECTION HANDLING =======
   
@@ -309,8 +326,31 @@ $(document).ready(function() {
     updateSelectedCount();
   });
   
+  // Variables to track shift-click selection
+  let lastChecked = null;
+  
   // Handle individual message checkboxes
-  $(".msg-checkbox").on("change", function() {
+  $(".msg-checkbox").on("click", function(e) {
+    const $checkboxes = $(".msg-checkbox");
+    const currentIndex = $checkboxes.index(this);
+    
+    // If shift key is pressed and there is a previous checkbox clicked
+    if (e.shiftKey && lastChecked !== null) {
+      const lastIndex = $checkboxes.index(lastChecked);
+      
+      // Determine range start/end
+      const start = Math.min(currentIndex, lastIndex);
+      const end = Math.max(currentIndex, lastIndex);
+      
+      // Set all checkboxes in range to the same state as the current one
+      const isChecked = this.checked;
+      $checkboxes.slice(start, end + 1).prop("checked", isChecked);
+    }
+    
+    // Update last checked
+    lastChecked = this;
+    
+    // Update the count
     updateSelectedCount();
   });
   
@@ -318,6 +358,7 @@ $(document).ready(function() {
   $("#btn-select-all").on("click", function() {
     $(".msg-checkbox").prop("checked", true);
     $("#check-select-all").prop("checked", true);
+    lastChecked = null; // Reset last checked to avoid unexpected shift-click behavior
     updateSelectedCount();
   });
   
@@ -332,6 +373,7 @@ $(document).ready(function() {
       }
     });
     
+    lastChecked = null; // Reset last checked to avoid unexpected shift-click behavior
     updateSelectedCount();
   });
   
@@ -339,13 +381,28 @@ $(document).ready(function() {
   $("#btn-clear-selection").on("click", function() {
     $(".msg-checkbox").prop("checked", false);
     $("#check-select-all").prop("checked", false);
+    lastChecked = null; // Reset last checked to avoid unexpected shift-click behavior
     updateSelectedCount();
   });
   
-  // Update selected count
+  // Update selected count and manage header checkbox state
   function updateSelectedCount() {
-    const count = $(".msg-checkbox:checked").length;
-    $("#selected-count").text(count);
+    const totalCheckboxes = $(".msg-checkbox").length;
+    const checkedCount = $(".msg-checkbox:checked").length;
+    
+    // Update display count
+    $("#selected-count").text(checkedCount);
+    
+    // Update the "select all" checkbox state
+    if (checkedCount === 0) {
+      $("#check-select-all").prop("checked", false);
+      $("#check-select-all").prop("indeterminate", false);
+    } else if (checkedCount === totalCheckboxes) {
+      $("#check-select-all").prop("checked", true);
+      $("#check-select-all").prop("indeterminate", false);
+    } else {
+      $("#check-select-all").prop("indeterminate", true);
+    }
   }
   
   // ======= MESSAGE DETAILS MODAL =======
@@ -627,6 +684,7 @@ $(document).ready(function() {
           // Uncheck all checkboxes
           $(".msg-checkbox").prop("checked", false);
           $("#check-select-all").prop("checked", false);
+          lastChecked = null; // Reset last checked
           updateSelectedCount();
           
           // Show success notification
@@ -790,6 +848,7 @@ $(document).ready(function() {
   $("#btn-label-malicious").on("click", function() {
     // Clear current selection
     $(".msg-checkbox").prop("checked", false);
+    lastChecked = null; // Reset last checked
     
     // Select all malicious messages that aren't already TP
     let maliciousCount = 0;
@@ -837,13 +896,14 @@ $(document).ready(function() {
   // Add shortcut help text
   const helpText = `
     <div class="mt-4">
-      <h5>Keyboard Shortcuts</h5>
+      <h5>Keyboard Shortcuts & Selection Tips</h5>
       <div class="row">
         <div class="col-md-6">
           <ul class="list-unstyled">
             <li><kbd>Ctrl+A</kbd> Select all messages</li>
             <li><kbd>Ctrl+U</kbd> Select unlabeled messages</li>
             <li><kbd>Ctrl+M</kbd> Label all malicious messages as TP</li>
+            <li><kbd>Shift+Click</kbd> Select range of messages</li>
           </ul>
         </div>
       </div>
