@@ -307,17 +307,24 @@ document.head.insertAdjacentHTML('beforeend', `
       margin-top: 2px;
     }
     
-    /* Fixed position header - simpler approach */
+    /* Create a unified sticky header */
     .card-header {
       position: sticky;
       top: 0;
       z-index: 1030;
+      border-bottom: none;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     }
     
-    /* Make table headers sticky too */
+    /* Remove spacing between card header and table */
+    .card-body {
+      padding-top: 0;
+    }
+    
+    /* Make table headers sticky and connected with card header */
     .table-responsive thead {
       position: sticky;
-      top: 56px; /* Approximate header height */
+      top: var(--card-header-height, 56px); /* Use CSS variable set by JS */
       z-index: 1020;
       background-color: #fff;
     }
@@ -326,6 +333,8 @@ document.head.insertAdjacentHTML('beforeend', `
     .table-head-row th {
       background-color: #f8f9fa;
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      padding-top: 10px;
+      padding-bottom: 10px;
     }
     
     /* Better mobile handling */
@@ -363,10 +372,7 @@ document.head.insertAdjacentHTML('beforeend', `
         justify-content: center;
       }
       
-      /* Adjust top offset for smaller screens */
-      .table-responsive thead {
-        top: 100px; /* More space for the wrapped header */
-      }
+      /* Top offset is handled dynamically by JS on small screens */
     }
   </style>
 `);
@@ -393,13 +399,35 @@ $(document).ready(function() {
   
   // Function to adjust table header position based on card header height
   function adjustTableHeaderPosition() {
+    // Calculate height with a small buffer to ensure no gap
     const cardHeaderHeight = $('.card-header').outerHeight();
+    
+    // Set the CSS custom property for table header positioning
+    document.documentElement.style.setProperty('--card-header-height', cardHeaderHeight + 'px');
     $('.table-responsive thead').css('top', cardHeaderHeight + 'px');
+    
+    // Also check the offset of the header
+    const headerOffset = $('.card-header').offset().top;
+    if (headerOffset > 0) {
+      // If there's a banner/notification above the header, adjust for that
+      $('.card-header').css('top', headerOffset + 'px');
+    }
   }
   
-  // Run on load and window resize
-  adjustTableHeaderPosition();
-  $(window).on('resize', adjustTableHeaderPosition);
+  // Run on load and window resize, with small delay to ensure accurate measurements
+  setTimeout(adjustTableHeaderPosition, 100);
+  $(window).on('resize', function() {
+    // Use timeout to avoid too many calculations during resize
+    clearTimeout(window.resizeTimer);
+    window.resizeTimer = setTimeout(adjustTableHeaderPosition, 100);
+  });
+  
+  // Adjust on scroll to ensure we catch any dynamic height changes
+  $(window).on('scroll', function() {
+    // Debounce to avoid excessive calculations
+    clearTimeout(window.scrollTimer);
+    window.scrollTimer = setTimeout(adjustTableHeaderPosition, 100);
+  });
 
   // ======= SELECTION HANDLING =======
   
