@@ -7,8 +7,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Make the data directory if it doesn't exist
-RUN mkdir -p /app/data
+# Make the data directory if it doesn't exist and set proper permissions
+RUN mkdir -p /app/data && chmod 777 /app/data
 
 # Host on all interfaces for Docker
 ENV FLASK_APP=app.py

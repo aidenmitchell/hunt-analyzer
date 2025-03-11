@@ -68,7 +68,14 @@ docker-compose up -d
 
 ### Persistent Data
 
-Your hunt data is stored in the `./data` directory which is mounted as a volume in the Docker container. This ensures your data persists across container restarts.
+Your hunt data is stored in a named Docker volume (`hunt_analyzer_data`), which ensures your data persists across container restarts and even container replacements. This data will remain intact even if you:
+
+- Pull new versions of the Hunt Analyzer image
+- Recreate the container
+- Upgrade the application
+- Reboot your server
+
+The data is stored securely in Docker's volume management system and will not be lost unless you explicitly delete the volume.
 
 ### Manual Deployment with Docker Compose
 
@@ -76,9 +83,11 @@ If you prefer to deploy directly with docker-compose:
 
 1. Create a directory for the application:
 ```bash
-mkdir -p hunt-analyzer/data
+mkdir -p hunt-analyzer
 cd hunt-analyzer
 ```
+
+Note: You don't need to create a data directory - the application uses a Docker named volume for data persistence.
 
 2. Download the docker-compose.yml file:
 ```bash

@@ -8,9 +8,13 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - ./data:/app/data
+      - hunt_analyzer_data:/app/data
     restart: unless-stopped
     environment:
       # Environment variables with explicit syntax for better Portainer compatibility
       SUBLIME_API_TOKEN: "${SUBLIME_API_TOKEN:-}"
       SECRET_KEY: "${SECRET_KEY:-change_this_to_a_random_string}"
+
+volumes:
+  hunt_analyzer_data:
+    # Named volume for persistent data storage between container replacements
