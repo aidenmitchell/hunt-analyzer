@@ -137,7 +137,7 @@
               <tr data-id="{{ msg.id }}" 
                   class="{% if msg.status == 'true_positive' %}table-success{% elif msg.status == 'false_positive' %}table-danger{% endif %} {% if msg.pre_labeled %}pre-labeled-row{% endif %}"
                   data-status="{{ msg.status if msg.status else 'unlabeled' }}"
-                  data-attack-score="{{ msg.attack_score_verdict }}"
+                  data-attack-score="{{ msg.attack_score_verdict or 'unknown' }}"
                   data-subject="{{ msg.subject }}"
                   data-sender="{{ msg.sender }}"
                   data-rules="{{ msg.rules_count }}">
@@ -171,9 +171,13 @@
                     'unknown': '#B1B1B1',
                     'graymail': '#464646'
                   } %}
+                  {% if msg.attack_score_verdict %}
                   <span class="badge" style="background-color: {{ verdict_colors.get(msg.attack_score_verdict, '#B1B1B1') }}">
                     {{ msg.attack_score_verdict | upper }}
                   </span>
+                  {% else %}
+                  <span class="badge bg-secondary">UNKNOWN</span>
+                  {% endif %}
                 </td>
                 <td>
                   <small>
@@ -244,6 +248,10 @@
 <script>
 // Helper function to get attack score colors
 function getAttackScoreColor(verdict) {
+  if (!verdict) {
+    return '#B1B1B1'; // Default to unknown/gray for null/empty values
+  }
+  
   const colors = {
     'likely_benign': '#B58FF5',
     'suspicious': '#EB7FA9',
@@ -521,7 +529,7 @@ $(document).ready(function() {
         </div>
         <div class="card-body">
           <p><strong>From:</strong> ${sender}</p>
-          <p><strong>Attack Score:</strong> <span class="badge" style="background-color: ${getAttackScoreColor($row.find("td:eq(2) span").text().trim().toLowerCase())}">${$row.find("td:eq(2) span").text().trim()}</span></p>
+          <p><strong>Attack Score:</strong> <span class="badge" style="background-color: ${getAttackScoreColor($row.find("td:eq(2) span").text().trim().toLowerCase() || 'unknown')}">${$row.find("td:eq(2) span").text().trim() || 'UNKNOWN'}</span></p>
           <p><strong>Flagged Rules:</strong> ${rules}</p>
           <div class="mt-3">
             <a href="${messageUrl}" target="_blank" class="btn btn-info">
