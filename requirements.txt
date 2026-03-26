@@ -1,4 +1,4 @@
 flask==2.3.3
-requests==2.32.2
+requests==2.33.0
 python-dotenv==1.0.0
 diff-match-patch==20241021
